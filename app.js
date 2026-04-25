@@ -302,13 +302,98 @@ function calcPlatformPct(p) {
 
 function handleStartTraining() {
   const p = loadProfile();
+  if (p) {
+    handleContinueTraining();
+    return;
+  }
+  openModal('请先创建学习档案', '开始训练前，需要创建一个本地学习档案来保存你的练习记录。', () => {
+    goPage('profile');
+  });
+}
+
+function handleContinueTraining() {
+  const p = loadProfile();
   if (!p) {
-    openModal('请先创建学习档案', '开始训练前，需要创建一个本地学习档案来保存你的练习记录。', () => {
+    openModal('请先创建学习档案', '继续训练前，需要创建一个本地学习档案来保存你的练习记录。', () => {
       goPage('profile');
     });
-  } else {
-    goPage('topicmap');
+    return;
   }
+
+  const target = getResumeTarget(p);
+  if (target) {
+    goQuestion(target.moduleId, target.qIndex);
+    const q = MODULE_DATA[target.moduleId].questions[target.qIndex];
+    showToast(`继续：${q.title}`, 'success');
+    return;
+  }
+
+  showToast('进入 RI-CLPM 模块选择', 'success');
+  renderModuleOverview();
+  goPage('module');
+}
+
+function getResumeTarget(p) {
+  const latestActivity = getLatestActivityTarget(p);
+  if (!latestActivity) return null;
+
+  if (latestActivity.source === 'attempt' && latestActivity.totalScore >= 60) {
+    return getNextUncompletedTarget(p, latestActivity) || latestActivity;
+  }
+  return latestActivity;
+}
+
+function getLatestActivityTarget(p) {
+  const activities = [
+    ...getDraftTargets(p),
+    ...getAttemptTargets(p)
+  ];
+  return activities
+    .filter(item => item.moduleId && item.activityAt)
+    .sort((a, b) => new Date(b.activityAt) - new Date(a.activityAt))[0] || null;
+}
+
+function getDraftTargets(p) {
+  const drafts = p && p.drafts ? p.drafts : {};
+  return Object.entries(drafts)
+    .map(([questionId, draft]) => ({
+      ...findQuestionTarget(questionId),
+      source: 'draft',
+      activityAt: draft && draft.savedAt
+    }));
+}
+
+function getAttemptTargets(p) {
+  const attempts = p && Array.isArray(p.attempts) ? p.attempts : [];
+  return attempts
+    .map(attempt => ({
+      ...findQuestionTarget(attempt.questionId),
+      source: 'attempt',
+      activityAt: attempt.submittedAt,
+      totalScore: attempt.totalScore || 0
+    }));
+}
+
+function getNextUncompletedTarget(p, fromTarget) {
+  const completed = new Set(getRiclpmProgress(p).completedQuestions || []);
+  const ordered = getModuleIds().flatMap(moduleId =>
+    MODULE_DATA[moduleId].questions.map((q, qIndex) => ({ moduleId, qIndex, questionId: q.id }))
+  );
+  const startIndex = ordered.findIndex(item =>
+    item.moduleId === fromTarget.moduleId && item.qIndex === fromTarget.qIndex
+  );
+  const rotated = startIndex >= 0
+    ? [...ordered.slice(startIndex + 1), ...ordered.slice(0, startIndex + 1)]
+    : ordered;
+  return rotated.find(item => !completed.has(item.questionId)) || null;
+}
+
+function findQuestionTarget(questionId) {
+  for (const moduleId of getModuleIds()) {
+    const qIndex = MODULE_DATA[moduleId].questions.findIndex(q => q.id === questionId);
+    if (qIndex >= 0) return { moduleId, qIndex, questionId };
+  }
+  return {};
 }
 
 /* ============================================================
