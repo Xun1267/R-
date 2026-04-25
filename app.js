@@ -586,7 +586,7 @@ function loadQuestionIntoWorkspace(qid) {
 
   $('ws-topbar-title').textContent = q.title;
   $('ws-q-title').textContent      = q.title;
-  $('ws-qtype').textContent        = getQuestionTypeLabel(q.type);
+  $('ws-qtype').textContent        = getQuestionTypeLabel(q);
   $('ws-qlevel').textContent       = q.level;
 
   $('ws-scenario').innerHTML = q.scenario;
@@ -595,6 +595,7 @@ function loadQuestionIntoWorkspace(qid) {
 
   if (q.simOutput) {
     $('ws-simoutput-section').style.display = 'block';
+    $('ws-simoutput-label').textContent = q.simOutputLabel || '模拟输出';
     $('ws-simoutput').textContent = q.simOutput;
   } else {
     $('ws-simoutput-section').style.display = 'none';
@@ -651,7 +652,7 @@ function loadQuestionIntoWorkspace(qid) {
 
   if (q.textPrompt) {
     $('ws-section-text').style.display = 'block';
-    $('ws-text-label').textContent = (q.type === 'judge' || q.type === 'multi') ? '判断理由' : '结论与表述';
+    $('ws-text-label').textContent = q.textLabel || ((q.type === 'judge' || q.type === 'multi') ? '判断理由' : '结论与表述');
     $('ws-text-num').textContent = getTextSectionNum(q);
     $('ws-text-prompt').textContent = q.textPrompt;
     $('ws-text-input').value = '';
@@ -690,14 +691,14 @@ function loadQuestionIntoWorkspace(qid) {
     }
     $('ws-save-status').textContent = '已恢复草稿';
   } else {
-    $('ws-code-input').value = '';
+    $('ws-code-input').value = q.starterCode || '';
     $('ws-text-input').value = '';
     $('ws-save-status').textContent = '未保存草稿';
   }
 }
 
-function getQuestionTypeLabel(type) {
-  return { judge:'判断题', multi:'多选题', values:'数值填写', code:'完整代码' }[type] || '练习题';
+function getQuestionTypeLabel(q) {
+  return q.typeLabel || { judge:'判断题', multi:'多选题', values:'数值填写', code:'完整代码' }[q.type] || '练习题';
 }
 
 function getTextSectionNum(q) {
@@ -901,7 +902,14 @@ function autoScore(q, answers) {
     const codeStr = answers.code || '';
     let hit = 0;
     q.answer.code_keywords.forEach(kw => { if (codeStr.includes(kw)) hit++; });
-    code = Math.round(hit / q.answer.code_keywords.length * 25);
+    const patternList = q.answer.code_patterns || [];
+    patternList.forEach(pattern => {
+      try {
+        if (new RegExp(pattern, 'm').test(codeStr)) hit++;
+      } catch(e) {}
+    });
+    const requiredCount = q.answer.code_keywords.length + patternList.length;
+    code = Math.round(hit / requiredCount * 25);
   }
 
   if (q.answer && q.answer.values && q.values && q.values.length) {
@@ -929,9 +937,20 @@ function autoScore(q, answers) {
     text = 8;
   }
 
-  const activeCount = Object.values(active).filter(Boolean).length || 1;
-  const raw = code + values + stat + text;
-  const total = Math.min(100, Math.round(raw / (activeCount * 25) * 100));
+  let total;
+  if (q.scoring) {
+    total = Math.round(
+      (code / 25) * (q.scoring.code || 0) +
+      (values / 25) * (q.scoring.values || 0) +
+      (stat / 25) * (q.scoring.stat || 0) +
+      (text / 25) * (q.scoring.text || 0)
+    );
+  } else {
+    const activeCount = Object.values(active).filter(Boolean).length || 1;
+    const raw = code + values + stat + text;
+    total = Math.round(raw / (activeCount * 25) * 100);
+  }
+  total = Math.min(100, total);
   return { total, code, values, stat, text, active };
 }
 

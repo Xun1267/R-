@@ -198,8 +198,10 @@ const MODULE_DATA = {
     ],
     level: '标准', types: ['代码补全'],
     questions: [
-      { id:'m3_q1', title:'补全 lavaan 基本语法：回归与残差', type:'代码补全', level:'标准', score:null },
-      { id:'m3_q2', title:'补全 lavaan 语法：间接效应定义', type:'代码补全', level:'标准', score:null }
+      { id:'m3_q1', title:'lavaan 运算符识别：~、=~、~~、:=', type:'代码补全', level:'入门', score:null },
+      { id:'m3_q2', title:'回归、残差与约束：补全局部语法', type:'代码补全', level:'标准', score:null },
+      { id:'m3_q3', title:'路径标签、间接效应与总效应定义', type:'代码补全', level:'标准', score:null },
+      { id:'m3_q4', title:'lavaan 报错定位：修改错误语法', type:'错误诊断', level:'标准', score:null }
     ]
   },
   4: {
@@ -447,6 +449,280 @@ const QUESTION_DATA = {
     values: [],
     textPrompt: '请用一句话说明：为什么 RI-CLPM 要先把随机截距分离出来？',
     simOutput: null,
+    dataName: null
+  },
+  m3_q1: {
+    title: 'lavaan 运算符识别：~、=~、~~、:=',
+    type: 'code',
+    typeLabel: '代码补全',
+    level: '入门',
+    scenario: `这一题只训练 lavaan 的四个核心运算符。你不需要写完整模型，只需要把每一行的符号补对，并判断一个语法说法。`,
+    tasks: [
+      '补全测量模型、回归路径、协方差和定义参数的运算符',
+      '判断 := 是否表示模型中的回归路径',
+      '用一句话说明 =~ 和 ~ 的区别'
+    ],
+    judgeQ: '`:=` 用来定义由已有参数计算出来的新参数，它本身不是一条新的回归路径。',
+    answer: {
+      judge: 'true',
+      code_keywords: [],
+      code_patterns: [
+        'visual\\s*=~\\s*x1\\s*\\+\\s*x2\\s*\\+\\s*x3',
+        'y\\s*~\\s*visual',
+        'x1\\s*~~\\s*x2',
+        'ind\\s*:=\\s*a\\s*\\*\\s*b'
+      ],
+      text_keywords: ['潜变量', '测量', '回归', '预测', '=~', '~']
+    },
+    scoring: { code: 60, stat: 20, text: 20 },
+    feedback: {
+      correct: [
+        '这一题的核心是把四个符号分开：=~ 定义潜变量测量关系，~ 定义回归路径，~~ 定义方差或协方差，:= 定义新参数。',
+        '`ind := a*b` 是定义参数，不是在模型里新增一条路径。'
+      ],
+      issues: [
+        '最常见错误是把 =~ 和 ~ 混用，导致潜变量定义和回归路径混在一起。',
+        '另一个常见错误是把 := 写成 ~，这样 lavaan 会把间接效应误当成回归关系。'
+      ],
+      why: [
+        'RI-CLPM 后续代码会同时出现测量式定义、路径回归、协方差和派生参数。如果这一层符号没分清，后面完整模型会很难排错。'
+      ],
+      next: [
+        '下一题会进一步练习残差方差、协方差、固定参数和路径标签。'
+      ]
+    },
+    hints: [
+      '=~ 左边通常是潜变量，右边是观测指标。',
+      '~ 左边通常是被预测变量，右边是预测变量。',
+      '~~ 可以写方差，也可以写协方差；:= 用来定义由已有标签计算的新参数。',
+      '参考答案：visual =~ x1 + x2 + x3；y ~ visual；x1 ~~ x2；ind := a*b。'
+    ],
+    values: [],
+    textLabel: '语法说明',
+    textPrompt: '请用一句话说明：`=~` 和 `~` 在 lavaan 中分别表示什么？',
+    simOutputLabel: '待补全代码',
+    simOutput:
+`model <- '
+  visual __ x1 + x2 + x3
+  y      __ visual
+  x1     __ x2
+  ind    __ a*b
+'`,
+    starterCode:
+`model <- '
+  visual __ x1 + x2 + x3
+  y      __ visual
+  x1     __ x2
+  ind    __ a*b
+'`,
+    dataName: null
+  },
+  m3_q2: {
+    title: '回归、残差与约束：补全局部语法',
+    type: 'code',
+    typeLabel: '代码补全',
+    level: '标准',
+    scenario: `下面是一段 RI-CLPM 前置语法练习。它不是完整 RI-CLPM，只训练回归路径、参数标签、残差方差固定和同波协方差写法。`,
+    tasks: [
+      '补全带标签的回归路径',
+      '补全观测变量残差方差固定为 0 的写法',
+      '补全同一时间点 within 成分的协方差',
+      '判断固定残差方差的语法含义'
+    ],
+    judgeQ: '`x1 ~~ 0*x1` 表示把观测变量 x1 的残差方差固定为 0。',
+    answer: {
+      judge: 'true',
+      code_keywords: [],
+      code_patterns: [
+        'wx2\\s*~\\s*a\\s*\\*\\s*wx1',
+        'wy2\\s*~\\s*b\\s*\\*\\s*wy1',
+        'x1\\s*~~\\s*0\\s*\\*\\s*x1',
+        'y1\\s*~~\\s*0\\s*\\*\\s*y1',
+        'wx1\\s*~~\\s*wy1'
+      ],
+      text_keywords: ['方差', '协方差', '固定', '残差', '~~', '0*']
+    },
+    scoring: { code: 60, stat: 20, text: 20 },
+    feedback: {
+      correct: [
+        '这题重点是三类写法：带标签回归、固定方差、协方差。',
+        '`a*wx1` 中的 a 是路径标签，`0*x1` 中的 0 是固定参数值，两者位置都很重要。'
+      ],
+      issues: [
+        '路径标签应写在右侧预测变量前面，例如 `wx2 ~ a*wx1`，不要写成 `a*wx2 ~ wx1`。',
+        '`x1 ~~ 0*x1` 固定的是 x1 的方差/残差方差项；`wx1 ~~ wy1` 则是在写两个变量的协方差。'
+      ],
+      why: [
+        'RI-CLPM 里经常要固定观测变量残差，并允许同波 within 成分相关。局部语法写错，会直接影响模型识别和参数含义。'
+      ],
+      next: [
+        '下一题会训练路径标签如何进入间接效应和总效应定义。'
+      ]
+    },
+    hints: [
+      '标签写在预测变量前面：结果变量 ~ 标签*预测变量。',
+      '固定参数写法是 数值*变量，例如 0*x1。',
+      '同波协方差使用 ~~，例如 wx1 ~~ wy1。',
+      '参考答案包含：wx2 ~ a*wx1；wy2 ~ b*wy1；x1 ~~ 0*x1；y1 ~~ 0*y1；wx1 ~~ wy1。'
+    ],
+    values: [],
+    textLabel: '语法说明',
+    textPrompt: '请用一句话说明：`~~` 在固定方差和定义协方差时有什么共同点？',
+    simOutputLabel: '待补全代码',
+    simOutput:
+`model <- '
+  wx2 __ a*wx1
+  wy2 __ b*wy1
+
+  x1  __ 0*x1
+  y1  __ 0*y1
+
+  wx1 __ wy1
+'`,
+    starterCode:
+`model <- '
+  wx2 __ a*wx1
+  wy2 __ b*wy1
+
+  x1  __ 0*x1
+  y1  __ 0*y1
+
+  wx1 __ wy1
+'`,
+    dataName: null
+  },
+  m3_q3: {
+    title: '路径标签、间接效应与总效应定义',
+    type: 'code',
+    typeLabel: '代码补全',
+    level: '标准',
+    scenario: `下面是一个最小中介模型，用来训练 lavaan 中的路径标签和定义参数。这里暂时不考虑 RI-CLPM 的完整结构，只练习 a、b、c 路径与间接效应。`,
+    tasks: [
+      '为 X -> M、M -> Y、X -> Y 三条路径加上标签',
+      '用 := 定义间接效应 ind',
+      '用 := 定义总效应 total',
+      '判断错误的间接效应写法'
+    ],
+    judgeQ: '`ind ~ a*b` 可以用来定义间接效应，因为间接效应也是一种路径。',
+    answer: {
+      judge: 'false',
+      code_keywords: [],
+      code_patterns: [
+        'm\\s*~\\s*a\\s*\\*\\s*x',
+        'y\\s*~\\s*b\\s*\\*\\s*m\\s*\\+\\s*c\\s*\\*\\s*x',
+        'ind\\s*:=\\s*a\\s*\\*\\s*b',
+        'total\\s*:=\\s*c\\s*\\+\\s*\\(?\\s*a\\s*\\*\\s*b\\s*\\)?'
+      ],
+      text_keywords: ['标签', '定义参数', ':=', '已有路径', '间接效应', '不是回归']
+    },
+    scoring: { code: 60, stat: 20, text: 20 },
+    feedback: {
+      correct: [
+        '间接效应应该用 `:=` 定义，例如 `ind := a*b`。',
+        'a、b、c 是路径标签；ind 和 total 是根据这些标签计算出来的定义参数。'
+      ],
+      issues: [
+        '`ind ~ a*b` 是错误思路，因为它把间接效应写成了新的回归路径。',
+        '路径标签必须先出现在模型路径中，后面的 `:=` 才能引用它们。'
+      ],
+      why: [
+        '纵向中介和 RI-CLPM 扩展模型都会大量使用标签和定义参数。把路径和派生效应分清，是后续写模型约束的基础。'
+      ],
+      next: [
+        '下一题会给你一段故意写错的 lavaan 代码，练习定位和修正错误。'
+      ]
+    },
+    hints: [
+      '路径标签写在预测变量前：m ~ a*x。',
+      '直接效应可以写成 y ~ b*m + c*x。',
+      '定义参数使用 :=，不是 ~。',
+      '参考答案：m ~ a*x；y ~ b*m + c*x；ind := a*b；total := c + (a*b)。'
+    ],
+    values: [],
+    textLabel: '语法说明',
+    textPrompt: '请用一句话说明：为什么 `ind := a*b` 要写在路径标签定义之后？',
+    simOutputLabel: '待补全代码',
+    simOutput:
+`model <- '
+  m __ a*x
+  y __ b*m + c*x
+
+  ind   __ a*b
+  total __ c + (a*b)
+'`,
+    starterCode:
+`model <- '
+  m __ a*x
+  y __ b*m + c*x
+
+  ind   __ a*b
+  total __ c + (a*b)
+'`,
+    dataName: null
+  },
+  m3_q4: {
+    title: 'lavaan 报错定位：修改错误语法',
+    type: 'code',
+    typeLabel: '错误诊断',
+    level: '标准',
+    scenario: `下面这段 lavaan 代码看起来像中介模型，但包含几个常见语法错误。请在代码框中写出修正后的版本，并用一句话说明你改了什么。`,
+    tasks: [
+      '修正标签位置错误',
+      '修正间接效应定义错误',
+      '修正协方差运算符错误',
+      '判断错误代码的主要问题'
+    ],
+    judgeQ: '错误代码的一个核心问题，是把定义参数 `ind` 写成了回归路径。',
+    answer: {
+      judge: 'true',
+      code_keywords: [],
+      code_patterns: [
+        'm\\s*~\\s*a\\s*\\*\\s*x',
+        'y\\s*~\\s*b\\s*\\*\\s*m\\s*\\+\\s*c\\s*\\*\\s*x',
+        'x\\s*~~\\s*m',
+        'ind\\s*:=\\s*a\\s*\\*\\s*b'
+      ],
+      text_keywords: ['标签位置', ':=', '~~', '间接效应', '回归路径', '修正']
+    },
+    scoring: { code: 60, stat: 20, text: 20 },
+    feedback: {
+      correct: [
+        '修正后的关键是：标签放在预测变量前，协方差使用 `~~`，间接效应用 `:=`。',
+        '错误诊断题的目标不是背完整模型，而是看到 lavaan 常见报错时能快速定位语法层面的问题。'
+      ],
+      issues: [
+        '`a*m ~ x` 这类写法标签位置错误；应写成 `m ~ a*x`。',
+        '`x ~ m` 是回归路径，不是协方差；协方差应写作 `x ~~ m`。',
+        '`ind ~ a*b` 把定义参数误写成路径；应使用 `ind := a*b`。'
+      ],
+      why: [
+        '真实写 lavaan 时，很多错误不是统计思想错，而是符号位置错。能定位这些小错误，后面写 RI-CLPM 完整代码会稳很多。'
+      ],
+      next: [
+        '完成 Module 3 后，可以进入 Module 4，把这些局部语法拼成完整 RI-CLPM 骨架。'
+      ]
+    },
+    hints: [
+      '路径标签应写在预测变量前：m ~ a*x。',
+      '协方差不是 ~，而是 ~~。',
+      '间接效应不是路径，用 := 定义。',
+      '参考修正版：m ~ a*x；y ~ b*m + c*x；x ~~ m；ind := a*b。'
+    ],
+    values: [],
+    textLabel: '语法说明',
+    textPrompt: '请用一句话说明：这段错误代码最容易造成哪一种 lavaan 语法混淆？',
+    simOutputLabel: '错误代码',
+    simOutput:
+`model_wrong <- '
+  a*m ~ x
+  y ~ b*m + c*x
+  x ~ m
+  ind ~ a*b
+'`,
+    starterCode:
+`model_fixed <- '
+  # 在这里写出修正后的 lavaan 代码
+'`,
     dataName: null
   },
   m4_q1: {
