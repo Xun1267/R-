@@ -629,7 +629,19 @@ function loadQuestionIntoWorkspace(qid) {
     $('ws-multi-options').innerHTML = '';
   }
 
-  $('ws-section-code').style.display = (q.type === 'code') ? 'block' : 'none';
+  const isSlotFill = q.answer && q.answer.graderType === 'slot_fill';
+  if (isSlotFill) {
+    $('ws-section-slots').style.display = 'block';
+    $('ws-slot-num').textContent = q.judgeQ ? 'B' : 'A';
+    $('ws-slot-label').textContent = q.slotLabel || '代码补全';
+    $('ws-slot-hint').textContent = q.slotHint || '每个空位单独选择，不需要删除或保留任何下划线。';
+    renderSlotFill(q);
+  } else {
+    $('ws-section-slots').style.display = 'none';
+    $('ws-slot-code').innerHTML = '';
+  }
+
+  $('ws-section-code').style.display = (q.type === 'code' && !isSlotFill) ? 'block' : 'none';
 
   const valueGrid = $('ws-value-grid');
   if (q.values && q.values.length) {
@@ -689,6 +701,11 @@ function loadQuestionIntoWorkspace(qid) {
         el.checked = draft.multi.includes(el.value);
       });
     }
+    if (draft.slots && isSlotFill) {
+      document.querySelectorAll('[data-slot-key]').forEach(el => {
+        if (draft.slots[el.dataset.slotKey] != null) el.value = draft.slots[el.dataset.slotKey];
+      });
+    }
     $('ws-save-status').textContent = '已恢复草稿';
   } else {
     $('ws-code-input').value = q.starterCode || '';
@@ -697,12 +714,38 @@ function loadQuestionIntoWorkspace(qid) {
   }
 }
 
+function renderSlotFill(q) {
+  const options = q.slotOptions || ['~', '=~', '~~', ':='];
+  const rows = q.slotRows || [];
+  $('ws-slot-code').innerHTML = rows.map(row => {
+    const parts = (row.parts || []).map(part => {
+      if (part.slot) {
+        const slot = (q.answer.slots || []).find(item => item.key === part.slot);
+        const label = slot ? slot.label : part.slot;
+        return `<select class="slot-select" data-slot-key="${part.slot}" aria-label="${label}">
+          <option value="">选择</option>
+          ${options.map(op => `<option value="${op}">${op}</option>`).join('')}
+        </select>`;
+      }
+      return escapeHtml(part.text || '');
+    }).join('');
+    return `<div class="slot-code-line">${parts}</div>`;
+  }).join('');
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[ch]));
+}
+
 function getQuestionTypeLabel(q) {
   return q.typeLabel || { judge:'判断题', multi:'多选题', values:'数值填写', code:'完整代码' }[q.type] || '练习题';
 }
 
 function getTextSectionNum(q) {
   if (q.type === 'judge' || q.type === 'multi') return 'B';
+  if (q.answer && q.answer.graderType === 'slot_fill') return q.judgeQ ? 'C' : 'B';
   if (q.type === 'code' && q.values && q.values.length) return 'C';
   if (q.type === 'values') return q.judgeQ ? 'C' : 'B';
   return 'D';
@@ -736,7 +779,8 @@ function saveDraft() {
     code:    $('ws-code-input').value,
     text:    $('ws-text-input').value,
     values:  {},
-    multi:   []
+    multi:   [],
+    slots:   {}
   };
   if (q && q.values) {
     q.values.forEach(v => {
@@ -746,6 +790,11 @@ function saveDraft() {
   }
   if (q && q.type === 'multi') {
     draft.multi = Array.from(document.querySelectorAll('[name="multi"]:checked')).map(el => el.value);
+  }
+  if (q && q.answer && q.answer.graderType === 'slot_fill') {
+    document.querySelectorAll('[data-slot-key]').forEach(el => {
+      draft.slots[el.dataset.slotKey] = el.value;
+    });
   }
   p.drafts[qid] = draft;
   p.profile.lastUsedAt = now();
@@ -814,6 +863,7 @@ function submitAnswer() {
     answers: {
       judge:  null,
       multi:  [],
+      slots:  {},
       code:   $('ws-code-input').value,
       values: {},
       text:   $('ws-text-input').value
@@ -823,6 +873,9 @@ function submitAnswer() {
   const judgeEl = document.querySelector('[name="judge"]:checked');
   if (judgeEl) submission.answers.judge = judgeEl.value;
   submission.answers.multi = Array.from(document.querySelectorAll('[name="multi"]:checked')).map(el => el.value);
+  document.querySelectorAll('[data-slot-key]').forEach(el => {
+    submission.answers.slots[el.dataset.slotKey] = el.value;
+  });
 
   if (q && q.values) {
     q.values.forEach(v => {
@@ -860,6 +913,10 @@ function submitAnswer() {
 function validateAnswer(q, answers) {
   if (q.judgeQ && !answers.judge) return '请先完成判断选择';
   if (q.type === 'multi' && (!answers.multi || !answers.multi.length)) return '请至少选择一个选项';
+  if (q.answer && q.answer.graderType === 'slot_fill') {
+    const missing = (q.answer.slots || []).some(slot => !answers.slots || !answers.slots[slot.key]);
+    if (missing) return '请完成所有代码空位';
+  }
   if (q.type === 'code' && q.answer && q.answer.code_keywords && !(answers.code || '').trim()) {
     return '请先填写或粘贴你的 R 代码';
   }
@@ -875,6 +932,9 @@ function validateAnswer(q, answers) {
 
 function autoScore(q, answers) {
   if (!q) return { total:0, code:0, values:0, stat:0, text:0 };
+  if (q.answer && q.answer.graderType === 'slot_fill') {
+    return gradeSlotFill(q, answers);
+  }
 
   let code = 0, values = 0, stat = 0, text = 0;
   const active = { code:false, values:false, stat:false, text:false };
@@ -954,6 +1014,57 @@ function autoScore(q, answers) {
   return { total, code, values, stat, text, active };
 }
 
+function gradeSlotFill(q, answers) {
+  const active = { code:true, values:false, stat:false, text:!!q.textPrompt };
+  let stat = 0;
+  if (q.answer && q.answer.judge) {
+    active.stat = true;
+    stat = answers.judge === q.answer.judge ? 25 : 0;
+  }
+
+  const slots = q.answer.slots || [];
+  const details = slots.map(slot => {
+    const userRaw = answers.slots ? answers.slots[slot.key] : '';
+    const user = normalizeSlotAnswer(userRaw);
+    const expected = (slot.expected || []).map(normalizeSlotAnswer);
+    const correct = expected.includes(user);
+    return {
+      key: slot.key,
+      label: slot.label,
+      user: userRaw || '未填写',
+      expected: slot.expected && slot.expected.length ? slot.expected[0] : '',
+      correct,
+      explanation: slot.explanation || ''
+    };
+  });
+  const correctCount = details.filter(item => item.correct).length;
+  const code = slots.length ? Math.round(correctCount / slots.length * 25) : 0;
+
+  const text = gradeTextAnswer(q, answers.text || '');
+  const total = Math.min(100, Math.round(
+    (code / 25) * (q.scoring.code || 0) +
+    (stat / 25) * (q.scoring.stat || 0) +
+    (text / 25) * (q.scoring.text || 0)
+  ));
+
+  return { total, code, values:0, stat, text, active, details };
+}
+
+function normalizeSlotAnswer(value) {
+  return String(value || '').replace(/\s+/g, '').trim();
+}
+
+function gradeTextAnswer(q, textValue) {
+  const textStr = (textValue || '').trim();
+  if (!q.textPrompt || !textStr) return 0;
+  if (textStr.length <= 30) return 8;
+  const keywords = (q.answer && q.answer.text_keywords) ||
+    ['个体内','within','RI-CLPM','路径','显著','拟合'];
+  let kwHit = 0;
+  keywords.forEach(kw => { if (textStr.includes(kw)) kwHit++; });
+  return Math.min(25, 10 + kwHit * 3);
+}
+
 function renderFeedbackPage(q, mod, submission, scores) {
   const qData = q || {};
   const fb = qData.feedback || {};
@@ -991,21 +1102,32 @@ function renderFeedbackPage(q, mod, submission, scores) {
   const userJudge = submission.answers.judge === 'true' ? '正确' : '错误';
   const standardMulti = qData.answer && qData.answer.multi ? formatChoiceList(qData.answer.multi) : '';
   const userMulti = submission.answers.multi && submission.answers.multi.length ? formatChoiceList(submission.answers.multi) : '未选择';
+  const slotDetails = scores.details || [];
+  const slotCorrects = slotDetails
+    .filter(item => item.correct)
+    .map(item => `${item.label}：填写 "${item.user}" 正确。${item.explanation}`);
+  const slotIssues = slotDetails
+    .filter(item => !item.correct)
+    .map(item => `${item.label}：你填写的是 "${item.user}"，这里应为 "${item.expected}"。${item.explanation}`);
 
-  const corrects = judgeWrong
-    ? [`这题的标准判断是"${standardJudge}"。先把判断方向校正，再看下面的方法学原因。`]
-    : multiWrong
-      ? [`这题的标准选项是 ${standardMulti}。先校正选项组合，再看下面的方法学原因。`]
-    : (fb.correct || ['代码结构包含了必要的模型组件。','判断方向正确。'].slice(0, scores.total > 60 ? 2 : 1));
+  const corrects = slotDetails.length
+    ? (slotCorrects.length ? slotCorrects : ['本题代码空位暂未答对。先看下面逐空反馈，再回到题目重试。'])
+    : judgeWrong
+      ? [`这题的标准判断是"${standardJudge}"。先把判断方向校正，再看下面的方法学原因。`]
+      : multiWrong
+        ? [`这题的标准选项是 ${standardMulti}。先校正选项组合，再看下面的方法学原因。`]
+        : (fb.correct || ['代码结构包含了必要的模型组件。','判断方向正确。'].slice(0, scores.total > 60 ? 2 : 1));
   $('fb-correct-list').innerHTML = corrects.map(c => `
     <div class="feedback-item"><span class="feedback-item__icon">✅</span>${c}</div>
   `).join('');
 
-  const issues = judgeWrong
-    ? [`你当前选择了"${userJudge}"，但题干中的关键信息支持"${standardJudge}"。`, ...(fb.issues || [])]
-    : multiWrong
-      ? [`你当前选择了 ${userMulti}，标准选项是 ${standardMulti}。`, ...(fb.issues || [])]
-    : (fb.issues || (scores.total < 80 ? ['部分作答尚需完善，建议查看提示后重新尝试。'] : []));
+  const issues = slotDetails.length
+    ? (slotIssues.length ? slotIssues : [])
+    : judgeWrong
+      ? [`你当前选择了"${userJudge}"，但题干中的关键信息支持"${standardJudge}"。`, ...(fb.issues || [])]
+      : multiWrong
+        ? [`你当前选择了 ${userMulti}，标准选项是 ${standardMulti}。`, ...(fb.issues || [])]
+        : (fb.issues || (scores.total < 80 ? ['部分作答尚需完善，建议查看提示后重新尝试。'] : []));
   $('fb-issues-list').innerHTML = issues.length
     ? issues.map(i => `<div class="feedback-item"><span class="feedback-item__icon">⚠️</span>${i}</div>`).join('')
     : '<div class="feedback-item"><span class="feedback-item__icon">🎉</span>没有发现明显问题，继续保持！</div>';

@@ -1539,6 +1539,41 @@
     }
     .code-editor-textarea::placeholder { color: #9a91a3; }
 
+    /* 槽位补全 */
+    .slot-code-wrap {
+      border: 1px solid var(--border-bright);
+      border-radius: var(--radius-md);
+      background: rgba(255,255,255,0.86);
+      box-shadow: var(--glass-shadow);
+      padding: 14px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.9;
+      color: #544c61;
+      overflow-x: auto;
+    }
+    .slot-code-line {
+      min-height: 30px;
+      white-space: nowrap;
+    }
+    .slot-select {
+      min-width: 72px;
+      margin: 0 5px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border-bright);
+      background: rgba(255,255,255,0.9);
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      outline: none;
+    }
+    .slot-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
     /* 数值填写 */
     .value-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px;

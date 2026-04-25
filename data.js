@@ -453,32 +453,40 @@ const QUESTION_DATA = {
   },
   m3_q1: {
     title: 'lavaan 运算符识别：~、=~、~~、:=',
-    type: 'code',
+    type: 'slot',
     typeLabel: '代码补全',
     level: '入门',
-    scenario: `这一题只训练 lavaan 的四个核心运算符。你不需要写完整模型，只需要把每一行的符号补对，并判断一个语法说法。`,
+    scenario: `这一题只训练 lavaan 的四个核心运算符。它不是完整可运行模型，所以不会按 R 运行结果判题；系统会逐个空位检查你是否选对语法符号。`,
     tasks: [
-      '补全测量模型、回归路径、协方差和定义参数的运算符',
+      '为每一行选择正确的 lavaan 运算符',
       '判断 := 是否表示模型中的回归路径',
       '用一句话说明 =~ 和 ~ 的区别'
     ],
     judgeQ: '`:=` 用来定义由已有参数计算出来的新参数，它本身不是一条新的回归路径。',
+    slotOptions: ['~', '=~', '~~', ':='],
+    slotRows: [
+      { parts: [{ text: "model <- '" }] },
+      { parts: [{ text: '  visual ' }, { slot: 'op_measure' }, { text: ' x1 + x2 + x3' }] },
+      { parts: [{ text: '  y      ' }, { slot: 'op_regress' }, { text: ' visual' }] },
+      { parts: [{ text: '  x1     ' }, { slot: 'op_cov' }, { text: ' x2' }] },
+      { parts: [{ text: '  ind    ' }, { slot: 'op_define' }, { text: ' a*b' }] },
+      { parts: [{ text: "'" }] }
+    ],
     answer: {
+      graderType: 'slot_fill',
       judge: 'true',
-      code_keywords: [],
-      code_patterns: [
-        'visual\\s*=~\\s*x1\\s*\\+\\s*x2\\s*\\+\\s*x3',
-        'y\\s*~\\s*visual',
-        'x1\\s*~~\\s*x2',
-        'ind\\s*:=\\s*a\\s*\\*\\s*b'
+      slots: [
+        { key: 'op_measure', expected: ['=~'], label: '第 1 空：潜变量测量关系', explanation: 'visual 由 x1、x2、x3 测量，因此应使用 =~。' },
+        { key: 'op_regress', expected: ['~'], label: '第 2 空：回归路径', explanation: '这里表示 y 被 visual 预测，因此应使用 ~。' },
+        { key: 'op_cov', expected: ['~~'], label: '第 3 空：协方差', explanation: 'x1 与 x2 的相关/协方差用 ~~ 表示。' },
+        { key: 'op_define', expected: [':='], label: '第 4 空：定义新参数', explanation: 'ind 是由 a*b 计算出的新参数，应使用 :=。' }
       ],
       text_keywords: ['潜变量', '测量', '回归', '预测', '=~', '~']
     },
     scoring: { code: 60, stat: 20, text: 20 },
     feedback: {
       correct: [
-        '这一题的核心是把四个符号分开：=~ 定义潜变量测量关系，~ 定义回归路径，~~ 定义方差或协方差，:= 定义新参数。',
-        '`ind := a*b` 是定义参数，不是在模型里新增一条路径。'
+        '这一题的核心是把四个符号分开：=~ 定义潜变量测量关系，~ 定义回归路径，~~ 定义方差或协方差，:= 定义新参数。'
       ],
       issues: [
         '最常见错误是把 =~ 和 ~ 混用，导致潜变量定义和回归路径混在一起。',
@@ -500,53 +508,49 @@ const QUESTION_DATA = {
     values: [],
     textLabel: '语法说明',
     textPrompt: '请用一句话说明：`=~` 和 `~` 在 lavaan 中分别表示什么？',
-    simOutputLabel: '待补全代码',
-    simOutput:
-`model <- '
-  visual __ x1 + x2 + x3
-  y      __ visual
-  x1     __ x2
-  ind    __ a*b
-'`,
-    starterCode:
-`model <- '
-  visual __ x1 + x2 + x3
-  y      __ visual
-  x1     __ x2
-  ind    __ a*b
-'`,
     dataName: null
   },
   m3_q2: {
     title: '回归、残差与约束：补全局部语法',
-    type: 'code',
+    type: 'slot',
     typeLabel: '代码补全',
     level: '标准',
     scenario: `下面是一段 RI-CLPM 前置语法练习。它不是完整 RI-CLPM，只训练回归路径、参数标签、残差方差固定和同波协方差写法。`,
     tasks: [
-      '补全带标签的回归路径',
-      '补全观测变量残差方差固定为 0 的写法',
-      '补全同一时间点 within 成分的协方差',
+      '为带标签的回归路径选择正确运算符',
+      '为观测变量残差方差固定为 0 的语句选择正确运算符',
+      '为同一时间点 within 成分协方差选择正确运算符',
       '判断固定残差方差的语法含义'
     ],
     judgeQ: '`x1 ~~ 0*x1` 表示把观测变量 x1 的残差方差固定为 0。',
+    slotOptions: ['~', '=~', '~~', ':='],
+    slotRows: [
+      { parts: [{ text: "model <- '" }] },
+      { parts: [{ text: '  wx2 ' }, { slot: 'reg_x' }, { text: ' a*wx1' }] },
+      { parts: [{ text: '  wy2 ' }, { slot: 'reg_y' }, { text: ' b*wy1' }] },
+      { parts: [{ text: '' }] },
+      { parts: [{ text: '  x1  ' }, { slot: 'var_x' }, { text: ' 0*x1' }] },
+      { parts: [{ text: '  y1  ' }, { slot: 'var_y' }, { text: ' 0*y1' }] },
+      { parts: [{ text: '' }] },
+      { parts: [{ text: '  wx1 ' }, { slot: 'cov_w' }, { text: ' wy1' }] },
+      { parts: [{ text: "'" }] }
+    ],
     answer: {
+      graderType: 'slot_fill',
       judge: 'true',
-      code_keywords: [],
-      code_patterns: [
-        'wx2\\s*~\\s*a\\s*\\*\\s*wx1',
-        'wy2\\s*~\\s*b\\s*\\*\\s*wy1',
-        'x1\\s*~~\\s*0\\s*\\*\\s*x1',
-        'y1\\s*~~\\s*0\\s*\\*\\s*y1',
-        'wx1\\s*~~\\s*wy1'
+      slots: [
+        { key: 'reg_x', expected: ['~'], label: '第 1 空：wx 自回归路径', explanation: 'wx2 被 a*wx1 预测，是回归路径，应使用 ~。' },
+        { key: 'reg_y', expected: ['~'], label: '第 2 空：wy 自回归路径', explanation: 'wy2 被 b*wy1 预测，是回归路径，应使用 ~。' },
+        { key: 'var_x', expected: ['~~'], label: '第 3 空：固定 x1 方差', explanation: '固定方差仍然使用 ~~，右侧写 0*x1。' },
+        { key: 'var_y', expected: ['~~'], label: '第 4 空：固定 y1 方差', explanation: '固定 y1 的方差/残差方差应写作 y1 ~~ 0*y1。' },
+        { key: 'cov_w', expected: ['~~'], label: '第 5 空：within 同波协方差', explanation: 'wx1 与 wy1 的协方差使用 ~~。' }
       ],
       text_keywords: ['方差', '协方差', '固定', '残差', '~~', '0*']
     },
     scoring: { code: 60, stat: 20, text: 20 },
     feedback: {
       correct: [
-        '这题重点是三类写法：带标签回归、固定方差、协方差。',
-        '`a*wx1` 中的 a 是路径标签，`0*x1` 中的 0 是固定参数值，两者位置都很重要。'
+        '这题重点是三类写法：带标签回归、固定方差、协方差。'
       ],
       issues: [
         '路径标签应写在右侧预测变量前面，例如 `wx2 ~ a*wx1`，不要写成 `a*wx2 ~ wx1`。',
@@ -568,58 +572,46 @@ const QUESTION_DATA = {
     values: [],
     textLabel: '语法说明',
     textPrompt: '请用一句话说明：`~~` 在固定方差和定义协方差时有什么共同点？',
-    simOutputLabel: '待补全代码',
-    simOutput:
-`model <- '
-  wx2 __ a*wx1
-  wy2 __ b*wy1
-
-  x1  __ 0*x1
-  y1  __ 0*y1
-
-  wx1 __ wy1
-'`,
-    starterCode:
-`model <- '
-  wx2 __ a*wx1
-  wy2 __ b*wy1
-
-  x1  __ 0*x1
-  y1  __ 0*y1
-
-  wx1 __ wy1
-'`,
     dataName: null
   },
   m3_q3: {
     title: '路径标签、间接效应与总效应定义',
-    type: 'code',
+    type: 'slot',
     typeLabel: '代码补全',
     level: '标准',
     scenario: `下面是一个最小中介模型，用来训练 lavaan 中的路径标签和定义参数。这里暂时不考虑 RI-CLPM 的完整结构，只练习 a、b、c 路径与间接效应。`,
     tasks: [
-      '为 X -> M、M -> Y、X -> Y 三条路径加上标签',
-      '用 := 定义间接效应 ind',
-      '用 := 定义总效应 total',
+      '为 X -> M、M -> Y、X -> Y 三条路径选择正确运算符',
+      '为间接效应 ind 选择正确运算符',
+      '为总效应 total 选择正确运算符',
       '判断错误的间接效应写法'
     ],
     judgeQ: '`ind ~ a*b` 可以用来定义间接效应，因为间接效应也是一种路径。',
+    slotOptions: ['~', '=~', '~~', ':='],
+    slotRows: [
+      { parts: [{ text: "model <- '" }] },
+      { parts: [{ text: '  m     ' }, { slot: 'path_a' }, { text: ' a*x' }] },
+      { parts: [{ text: '  y     ' }, { slot: 'path_bc' }, { text: ' b*m + c*x' }] },
+      { parts: [{ text: '' }] },
+      { parts: [{ text: '  ind   ' }, { slot: 'ind' }, { text: ' a*b' }] },
+      { parts: [{ text: '  total ' }, { slot: 'total' }, { text: ' c + (a*b)' }] },
+      { parts: [{ text: "'" }] }
+    ],
     answer: {
+      graderType: 'slot_fill',
       judge: 'false',
-      code_keywords: [],
-      code_patterns: [
-        'm\\s*~\\s*a\\s*\\*\\s*x',
-        'y\\s*~\\s*b\\s*\\*\\s*m\\s*\\+\\s*c\\s*\\*\\s*x',
-        'ind\\s*:=\\s*a\\s*\\*\\s*b',
-        'total\\s*:=\\s*c\\s*\\+\\s*\\(?\\s*a\\s*\\*\\s*b\\s*\\)?'
+      slots: [
+        { key: 'path_a', expected: ['~'], label: '第 1 空：a 路径', explanation: 'm 被 x 预测，这是回归路径，应使用 ~。' },
+        { key: 'path_bc', expected: ['~'], label: '第 2 空：b/c 路径', explanation: 'y 被 m 和 x 预测，也是回归路径，应使用 ~。' },
+        { key: 'ind', expected: [':='], label: '第 3 空：间接效应定义', explanation: 'ind 是由 a*b 计算出来的新参数，应使用 :=。' },
+        { key: 'total', expected: [':='], label: '第 4 空：总效应定义', explanation: 'total 是由 c 与 a*b 计算出来的新参数，应使用 :=。' }
       ],
       text_keywords: ['标签', '定义参数', ':=', '已有路径', '间接效应', '不是回归']
     },
     scoring: { code: 60, stat: 20, text: 20 },
     feedback: {
       correct: [
-        '间接效应应该用 `:=` 定义，例如 `ind := a*b`。',
-        'a、b、c 是路径标签；ind 和 total 是根据这些标签计算出来的定义参数。'
+        '间接效应应该用 `:=` 定义，例如 `ind := a*b`。'
       ],
       issues: [
         '`ind ~ a*b` 是错误思路，因为它把间接效应写成了新的回归路径。',
@@ -641,31 +633,14 @@ const QUESTION_DATA = {
     values: [],
     textLabel: '语法说明',
     textPrompt: '请用一句话说明：为什么 `ind := a*b` 要写在路径标签定义之后？',
-    simOutputLabel: '待补全代码',
-    simOutput:
-`model <- '
-  m __ a*x
-  y __ b*m + c*x
-
-  ind   __ a*b
-  total __ c + (a*b)
-'`,
-    starterCode:
-`model <- '
-  m __ a*x
-  y __ b*m + c*x
-
-  ind   __ a*b
-  total __ c + (a*b)
-'`,
     dataName: null
   },
   m3_q4: {
     title: 'lavaan 报错定位：修改错误语法',
-    type: 'code',
+    type: 'slot',
     typeLabel: '错误诊断',
     level: '标准',
-    scenario: `下面这段 lavaan 代码看起来像中介模型，但包含几个常见语法错误。请在代码框中写出修正后的版本，并用一句话说明你改了什么。`,
+    scenario: `下面这段 lavaan 代码看起来像中介模型，但包含几个常见语法错误。请先看错误代码，再在下方修正版中为每一处选择正确语法。`,
     tasks: [
       '修正标签位置错误',
       '修正间接效应定义错误',
@@ -673,22 +648,38 @@ const QUESTION_DATA = {
       '判断错误代码的主要问题'
     ],
     judgeQ: '错误代码的一个核心问题，是把定义参数 `ind` 写成了回归路径。',
+    simOutputLabel: '错误代码',
+    simOutput:
+`model_wrong <- '
+  a*m ~ x
+  y ~ b*m + c*x
+  x ~ m
+  ind ~ a*b
+'`,
+    slotOptions: ['~', '=~', '~~', ':='],
+    slotRows: [
+      { parts: [{ text: "model_fixed <- '" }] },
+      { parts: [{ text: '  m   ' }, { slot: 'fix_a' }, { text: ' a*x' }] },
+      { parts: [{ text: '  y   ' }, { slot: 'fix_bc' }, { text: ' b*m + c*x' }] },
+      { parts: [{ text: '  x   ' }, { slot: 'fix_cov' }, { text: ' m' }] },
+      { parts: [{ text: '  ind ' }, { slot: 'fix_ind' }, { text: ' a*b' }] },
+      { parts: [{ text: "'" }] }
+    ],
     answer: {
+      graderType: 'slot_fill',
       judge: 'true',
-      code_keywords: [],
-      code_patterns: [
-        'm\\s*~\\s*a\\s*\\*\\s*x',
-        'y\\s*~\\s*b\\s*\\*\\s*m\\s*\\+\\s*c\\s*\\*\\s*x',
-        'x\\s*~~\\s*m',
-        'ind\\s*:=\\s*a\\s*\\*\\s*b'
+      slots: [
+        { key: 'fix_a', expected: ['~'], label: '第 1 空：修正 a 路径', explanation: '正确写法是 m ~ a*x，标签 a 放在预测变量 x 前。' },
+        { key: 'fix_bc', expected: ['~'], label: '第 2 空：修正 b/c 路径', explanation: 'y ~ b*m + c*x 是回归路径。' },
+        { key: 'fix_cov', expected: ['~~'], label: '第 3 空：修正协方差', explanation: 'x 与 m 的协方差应写作 x ~~ m，不是 x ~ m。' },
+        { key: 'fix_ind', expected: [':='], label: '第 4 空：修正间接效应', explanation: 'ind 是定义参数，应写作 ind := a*b。' }
       ],
       text_keywords: ['标签位置', ':=', '~~', '间接效应', '回归路径', '修正']
     },
     scoring: { code: 60, stat: 20, text: 20 },
     feedback: {
       correct: [
-        '修正后的关键是：标签放在预测变量前，协方差使用 `~~`，间接效应用 `:=`。',
-        '错误诊断题的目标不是背完整模型，而是看到 lavaan 常见报错时能快速定位语法层面的问题。'
+        '修正后的关键是：标签放在预测变量前，协方差使用 `~~`，间接效应用 `:=`。'
       ],
       issues: [
         '`a*m ~ x` 这类写法标签位置错误；应写成 `m ~ a*x`。',
@@ -711,18 +702,6 @@ const QUESTION_DATA = {
     values: [],
     textLabel: '语法说明',
     textPrompt: '请用一句话说明：这段错误代码最容易造成哪一种 lavaan 语法混淆？',
-    simOutputLabel: '错误代码',
-    simOutput:
-`model_wrong <- '
-  a*m ~ x
-  y ~ b*m + c*x
-  x ~ m
-  ind ~ a*b
-'`,
-    starterCode:
-`model_fixed <- '
-  # 在这里写出修正后的 lavaan 代码
-'`,
     dataName: null
   },
   m4_q1: {
