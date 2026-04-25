@@ -638,6 +638,7 @@ function loadQuestionIntoWorkspace(qid) {
 
   if (q.textPrompt) {
     $('ws-section-text').style.display = 'block';
+    $('ws-text-label').textContent = q.type === 'judge' ? '判断理由' : '结论与表述';
     $('ws-text-prompt').textContent = q.textPrompt;
     $('ws-text-input').value = '';
     $('ws-char-count').textContent = '0';
@@ -764,6 +765,10 @@ function submitAnswer() {
   const qid = wsState.questionId;
   const q   = QUESTION_DATA[qid];
   const mod = MODULE_DATA[wsState.moduleId];
+  if (!q) {
+    showToast('这道题正在完善中，请先选择本模块中已开放的题目', 'warning');
+    return;
+  }
 
   const submission = {
     questionId:  qid,
@@ -785,8 +790,17 @@ function submitAnswer() {
   if (q && q.values) {
     q.values.forEach(v => {
       const el = $(`val-${v.key}`);
-      if (el) submission.answers.values[v.key] = parseFloat(el.value) || null;
+      if (el) {
+        const parsed = parseFloat(el.value);
+        submission.answers.values[v.key] = Number.isNaN(parsed) ? null : parsed;
+      }
     });
+  }
+
+  const validationMsg = validateAnswer(q, submission.answers);
+  if (validationMsg) {
+    showToast(validationMsg, 'warning');
+    return;
   }
 
   const scores = autoScore(q, submission.answers);
@@ -806,27 +820,42 @@ function submitAnswer() {
   goPage('feedback');
 }
 
+function validateAnswer(q, answers) {
+  if (q.judgeQ && !answers.judge) return '请先完成判断选择';
+  if (q.type === 'code' && q.answer && q.answer.code_keywords && !(answers.code || '').trim()) {
+    return '请先填写或粘贴你的 R 代码';
+  }
+  if (q.values && q.values.length) {
+    const missing = q.values.some(v => answers.values[v.key] === null || Number.isNaN(answers.values[v.key]));
+    if (missing) return '请填写所有关键数值';
+  }
+  if (q.textPrompt && (answers.text || '').trim().length < 12) {
+    return '请补充 1-3 句话说明你的判断理由';
+  }
+  return '';
+}
+
 function autoScore(q, answers) {
   if (!q) return { total:0, code:0, values:0, stat:0, text:0 };
 
   let code = 0, values = 0, stat = 0, text = 0;
+  const active = { code:false, values:false, stat:false, text:false };
 
   if (q.answer && q.answer.judge) {
+    active.stat = true;
     stat = answers.judge === q.answer.judge ? 25 : 0;
-  } else {
-    stat = 15;
   }
 
   if (q.type === 'code' && q.answer && q.answer.code_keywords) {
+    active.code = true;
     const codeStr = answers.code || '';
     let hit = 0;
     q.answer.code_keywords.forEach(kw => { if (codeStr.includes(kw)) hit++; });
     code = Math.round(hit / q.answer.code_keywords.length * 25);
-  } else {
-    code = 10;
   }
 
   if (q.answer && q.answer.values && q.values && q.values.length) {
+    active.values = true;
     let hit = 0;
     q.values.forEach(v => {
       const range = q.answer.values[v.key];
@@ -834,38 +863,47 @@ function autoScore(q, answers) {
       if (Array.isArray(range) && val !== null && val >= range[0] && val <= range[1]) hit++;
     });
     values = Math.round(hit / q.values.length * 25);
-  } else {
-    values = 10;
   }
 
-  const textStr = answers.text || '';
-  if (textStr.length > 30) {
-    const keywords = ['个体内','within','RI-CLPM','路径','显著','拟合'];
+  const textStr = (answers.text || '').trim();
+  if (q.textPrompt) {
+    active.text = true;
+  }
+  if (active.text && textStr.length > 30) {
+    const keywords = (q.answer && q.answer.text_keywords) ||
+      ['个体内','within','RI-CLPM','路径','显著','拟合'];
     let kwHit = 0;
     keywords.forEach(kw => { if (textStr.includes(kw)) kwHit++; });
     text = Math.min(25, 10 + kwHit * 3);
-  } else if (textStr.length > 0) {
+  } else if (active.text && textStr.length > 0) {
     text = 8;
-  } else {
-    text = 0;
   }
 
-  const total = Math.min(100, code + values + stat + text);
-  return { total, code, values, stat, text };
+  const activeCount = Object.values(active).filter(Boolean).length || 1;
+  const raw = code + values + stat + text;
+  const total = Math.min(100, Math.round(raw / (activeCount * 25) * 100));
+  return { total, code, values, stat, text, active };
 }
 
 function renderFeedbackPage(q, mod, submission, scores) {
   const qData = q || {};
   const fb = qData.feedback || {};
 
-  $('fb-title').textContent = qData.title || '反馈报告';
-  $('fb-meta').textContent  = `${mod.title} · ${(mod.questions[wsState.qIndex]||{}).type||''} · ${(mod.questions[wsState.qIndex]||{}).level||''}`;
+  $('fb-title').textContent = `本题反馈：${qData.title || '反馈报告'}`;
+  $('fb-meta').textContent  = `${mod.title} · 第 ${wsState.qIndex + 1} / ${mod.questions.length} 题 · ${(mod.questions[wsState.qIndex]||{}).type||''} · ${(mod.questions[wsState.qIndex]||{}).level||''}`;
 
   $('fb-total-score').textContent = scores.total;
+  $('fb-score-label').textContent = '本题 / 100';
   $('fb-score-code').textContent  = scores.code;
   $('fb-score-values').textContent= scores.values;
   $('fb-score-stat').textContent  = scores.stat;
   $('fb-score-text').textContent  = scores.text;
+
+  const scoreDims = document.querySelectorAll('.score-breakdown .score-dim');
+  const active = scores.active || { code:true, values:true, stat:true, text:true };
+  ['code','values','stat','text'].forEach((key, idx) => {
+    if (scoreDims[idx]) scoreDims[idx].style.display = active[key] ? '' : 'none';
+  });
 
   const badgesEl = $('fb-badges');
   badgesEl.innerHTML = '';
@@ -876,12 +914,21 @@ function renderFeedbackPage(q, mod, submission, scores) {
   else if (scores.total >= 50) badgesEl.innerHTML += `<span class="badge badge--orange">📖 继续练习</span>`;
   else badgesEl.innerHTML += `<span class="badge badge--red">🔄 需要复习</span>`;
 
-  const corrects = fb.correct || ['代码结构包含了必要的模型组件。','判断方向正确。'].slice(0, scores.total > 60 ? 2 : 1);
+  const judgeWrong = qData.answer && qData.answer.judge &&
+    submission.answers.judge && submission.answers.judge !== qData.answer.judge;
+  const standardJudge = qData.answer && qData.answer.judge === 'true' ? '正确' : '错误';
+  const userJudge = submission.answers.judge === 'true' ? '正确' : '错误';
+
+  const corrects = judgeWrong
+    ? [`这题的标准判断是"${standardJudge}"。先把判断方向校正，再看下面的方法学原因。`]
+    : (fb.correct || ['代码结构包含了必要的模型组件。','判断方向正确。'].slice(0, scores.total > 60 ? 2 : 1));
   $('fb-correct-list').innerHTML = corrects.map(c => `
     <div class="feedback-item"><span class="feedback-item__icon">✅</span>${c}</div>
   `).join('');
 
-  const issues = fb.issues || (scores.total < 80 ? ['部分作答尚需完善，建议查看提示后重新尝试。'] : []);
+  const issues = judgeWrong
+    ? [`你当前选择了"${userJudge}"，但题干中的关键信息支持"${standardJudge}"。`, ...(fb.issues || [])]
+    : (fb.issues || (scores.total < 80 ? ['部分作答尚需完善，建议查看提示后重新尝试。'] : []));
   $('fb-issues-list').innerHTML = issues.length
     ? issues.map(i => `<div class="feedback-item"><span class="feedback-item__icon">⚠️</span>${i}</div>`).join('')
     : '<div class="feedback-item"><span class="feedback-item__icon">🎉</span>没有发现明显问题，继续保持！</div>';
@@ -895,6 +942,14 @@ function renderFeedbackPage(q, mod, submission, scores) {
   $('fb-suggestion-list').innerHTML = next.map(n => `
     <div class="suggestion-item"><span class="suggestion-item__icon">🎯</span>${n}</div>
   `).join('');
+
+  const nextBtn = $('fb-next-btn');
+  if (wsState.qIndex < mod.questions.length - 1) {
+    const nextQuestionMeta = mod.questions[wsState.qIndex + 1];
+    nextBtn.textContent = `下一题：${nextQuestionMeta.title}`;
+  } else {
+    nextBtn.textContent = '完成模块，返回模块选择';
+  }
 }
 
 function retryQuestion() {
