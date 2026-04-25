@@ -586,7 +586,7 @@ function loadQuestionIntoWorkspace(qid) {
 
   $('ws-topbar-title').textContent = q.title;
   $('ws-q-title').textContent      = q.title;
-  $('ws-qtype').textContent        = q.type === 'judge' ? '判断题' : q.type === 'values' ? '数值填写' : '完整代码';
+  $('ws-qtype').textContent        = getQuestionTypeLabel(q.type);
   $('ws-qlevel').textContent       = q.level;
 
   $('ws-scenario').innerHTML = q.scenario;
@@ -615,6 +615,19 @@ function loadQuestionIntoWorkspace(qid) {
     $('ws-section-judge').style.display = 'none';
   }
 
+  if (q.type === 'multi' && q.options && q.options.length) {
+    $('ws-section-multi').style.display = 'block';
+    $('ws-multi-options').innerHTML = q.options.map(opt => `
+      <label class="checkbox-option">
+        <input type="checkbox" name="multi" value="${opt.id}">
+        <span>${opt.text}</span>
+      </label>
+    `).join('');
+  } else {
+    $('ws-section-multi').style.display = 'none';
+    $('ws-multi-options').innerHTML = '';
+  }
+
   $('ws-section-code').style.display = (q.type === 'code') ? 'block' : 'none';
 
   const valueGrid = $('ws-value-grid');
@@ -638,7 +651,8 @@ function loadQuestionIntoWorkspace(qid) {
 
   if (q.textPrompt) {
     $('ws-section-text').style.display = 'block';
-    $('ws-text-label').textContent = q.type === 'judge' ? '判断理由' : '结论与表述';
+    $('ws-text-label').textContent = (q.type === 'judge' || q.type === 'multi') ? '判断理由' : '结论与表述';
+    $('ws-text-num').textContent = getTextSectionNum(q);
     $('ws-text-prompt').textContent = q.textPrompt;
     $('ws-text-input').value = '';
     $('ws-char-count').textContent = '0';
@@ -669,12 +683,28 @@ function loadQuestionIntoWorkspace(qid) {
         if (el && draft.values[v.key] != null) el.value = draft.values[v.key];
       });
     }
+    if (draft.multi && q.type === 'multi') {
+      document.querySelectorAll('[name="multi"]').forEach(el => {
+        el.checked = draft.multi.includes(el.value);
+      });
+    }
     $('ws-save-status').textContent = '已恢复草稿';
   } else {
     $('ws-code-input').value = '';
     $('ws-text-input').value = '';
     $('ws-save-status').textContent = '未保存草稿';
   }
+}
+
+function getQuestionTypeLabel(type) {
+  return { judge:'判断题', multi:'多选题', values:'数值填写', code:'完整代码' }[type] || '练习题';
+}
+
+function getTextSectionNum(q) {
+  if (q.type === 'judge' || q.type === 'multi') return 'B';
+  if (q.type === 'code' && q.values && q.values.length) return 'C';
+  if (q.type === 'values') return q.judgeQ ? 'C' : 'B';
+  return 'D';
 }
 
 $('ws-text-input') && $('ws-text-input').addEventListener('input', function() {
@@ -704,13 +734,17 @@ function saveDraft() {
     savedAt: now(),
     code:    $('ws-code-input').value,
     text:    $('ws-text-input').value,
-    values:  {}
+    values:  {},
+    multi:   []
   };
   if (q && q.values) {
     q.values.forEach(v => {
       const el = $(`val-${v.key}`);
       if (el) draft.values[v.key] = el.value;
     });
+  }
+  if (q && q.type === 'multi') {
+    draft.multi = Array.from(document.querySelectorAll('[name="multi"]:checked')).map(el => el.value);
   }
   p.drafts[qid] = draft;
   p.profile.lastUsedAt = now();
@@ -778,6 +812,7 @@ function submitAnswer() {
     hintsUsed:   wsState.hintsShown,
     answers: {
       judge:  null,
+      multi:  [],
       code:   $('ws-code-input').value,
       values: {},
       text:   $('ws-text-input').value
@@ -786,6 +821,7 @@ function submitAnswer() {
 
   const judgeEl = document.querySelector('[name="judge"]:checked');
   if (judgeEl) submission.answers.judge = judgeEl.value;
+  submission.answers.multi = Array.from(document.querySelectorAll('[name="multi"]:checked')).map(el => el.value);
 
   if (q && q.values) {
     q.values.forEach(v => {
@@ -822,6 +858,7 @@ function submitAnswer() {
 
 function validateAnswer(q, answers) {
   if (q.judgeQ && !answers.judge) return '请先完成判断选择';
+  if (q.type === 'multi' && (!answers.multi || !answers.multi.length)) return '请至少选择一个选项';
   if (q.type === 'code' && q.answer && q.answer.code_keywords && !(answers.code || '').trim()) {
     return '请先填写或粘贴你的 R 代码';
   }
@@ -844,6 +881,19 @@ function autoScore(q, answers) {
   if (q.answer && q.answer.judge) {
     active.stat = true;
     stat = answers.judge === q.answer.judge ? 25 : 0;
+  }
+
+  if (q.answer && q.answer.multi && q.options && q.options.length) {
+    active.stat = true;
+    const correct = new Set(q.answer.multi);
+    const selected = new Set(answers.multi || []);
+    let optionScore = 0;
+    q.options.forEach(opt => {
+      const shouldSelect = correct.has(opt.id);
+      const didSelect = selected.has(opt.id);
+      if (shouldSelect === didSelect) optionScore++;
+    });
+    stat = Math.round(optionScore / q.options.length * 25);
   }
 
   if (q.type === 'code' && q.answer && q.answer.code_keywords) {
@@ -916,11 +966,17 @@ function renderFeedbackPage(q, mod, submission, scores) {
 
   const judgeWrong = qData.answer && qData.answer.judge &&
     submission.answers.judge && submission.answers.judge !== qData.answer.judge;
+  const multiWrong = qData.answer && qData.answer.multi &&
+    normalizeChoiceList(submission.answers.multi).join('|') !== normalizeChoiceList(qData.answer.multi).join('|');
   const standardJudge = qData.answer && qData.answer.judge === 'true' ? '正确' : '错误';
   const userJudge = submission.answers.judge === 'true' ? '正确' : '错误';
+  const standardMulti = qData.answer && qData.answer.multi ? formatChoiceList(qData.answer.multi) : '';
+  const userMulti = submission.answers.multi && submission.answers.multi.length ? formatChoiceList(submission.answers.multi) : '未选择';
 
   const corrects = judgeWrong
     ? [`这题的标准判断是"${standardJudge}"。先把判断方向校正，再看下面的方法学原因。`]
+    : multiWrong
+      ? [`这题的标准选项是 ${standardMulti}。先校正选项组合，再看下面的方法学原因。`]
     : (fb.correct || ['代码结构包含了必要的模型组件。','判断方向正确。'].slice(0, scores.total > 60 ? 2 : 1));
   $('fb-correct-list').innerHTML = corrects.map(c => `
     <div class="feedback-item"><span class="feedback-item__icon">✅</span>${c}</div>
@@ -928,6 +984,8 @@ function renderFeedbackPage(q, mod, submission, scores) {
 
   const issues = judgeWrong
     ? [`你当前选择了"${userJudge}"，但题干中的关键信息支持"${standardJudge}"。`, ...(fb.issues || [])]
+    : multiWrong
+      ? [`你当前选择了 ${userMulti}，标准选项是 ${standardMulti}。`, ...(fb.issues || [])]
     : (fb.issues || (scores.total < 80 ? ['部分作答尚需完善，建议查看提示后重新尝试。'] : []));
   $('fb-issues-list').innerHTML = issues.length
     ? issues.map(i => `<div class="feedback-item"><span class="feedback-item__icon">⚠️</span>${i}</div>`).join('')
@@ -950,6 +1008,15 @@ function renderFeedbackPage(q, mod, submission, scores) {
   } else {
     nextBtn.textContent = '完成模块，返回模块选择';
   }
+}
+
+function normalizeChoiceList(list) {
+  return [...(list || [])].sort();
+}
+
+function formatChoiceList(list) {
+  const normalized = normalizeChoiceList(list);
+  return normalized.length ? normalized.map(item => item.toUpperCase()).join('、') : '无';
 }
 
 function retryQuestion() {
