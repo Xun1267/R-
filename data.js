@@ -1,3 +1,167 @@
+const SITE_ARCHITECTURE = [
+  {
+    key: 'foundation',
+    name: '数据准备与整理',
+    order: '01',
+    description: '从数据导入、整理、可视化到量表预处理，建立进入统计分析前最关键的实践基础。',
+    topics: [
+      {
+        key: 'r-basics',
+        name: 'R 基础与数据整理',
+        status: '数据基础',
+        badge: 'dplyr / tidyr',
+        desc: '覆盖数据导入、筛选、重编码、合并、分组汇总、宽长转换与心理学常见数据结构整理。',
+        modules: ['数据导入与数据类型', 'select/filter/mutate/summarise', '宽表与长表转换', '缺失值、异常值与重编码', '心理学常见数据结构整理']
+      },
+      {
+        key: 'visualization',
+        name: '数据可视化与结果图表',
+        status: '图表表达',
+        badge: 'ggplot2',
+        desc: '训练发表级图表、教学图表和结果段配图，让统计结果能被清楚呈现。',
+        modules: ['单变量图', '分组比较图', '相关与回归图', '交互作用图', '结果段配图与图注写法']
+      },
+      {
+        key: 'descriptives',
+        name: '描述统计、信度与量表预处理',
+        status: '量表准备',
+        badge: 'psych',
+        desc: '面向心理学高频量表数据，覆盖描述统计、相关矩阵、信度、反向计分和题项清理。',
+        modules: ['均值、标准差、偏度、峰度', '相关矩阵与可视化', "Cronbach's alpha、McDonald's omega", '反向计分与总分生成', '题项分析与量表清理']
+      }
+    ]
+  },
+  {
+    key: 'core',
+    name: '常用统计分析',
+    order: '02',
+    description: '覆盖实验设计、常规实证论文、重复测量、缺失处理与研究设计阶段的样本量设计。',
+    topics: [
+      {
+        key: 'anova',
+        name: 't 检验、方差分析与事后比较',
+        status: '实验设计',
+        badge: 'afex / emmeans',
+        desc: '服务心理学实验设计训练，处理被试间、被试内和混合设计，并训练 APA 结果表述。',
+        modules: ['独立样本 t 检验', '配对样本 t 检验', '单因素与双因素 ANOVA', '重复测量 ANOVA', '简单效应与事后比较', 'APA 结果表述']
+      },
+      {
+        key: 'regression',
+        name: '回归、中介与调节分析',
+        status: '实证常用',
+        badge: '回归 / lavaan',
+        desc: '从相关与线性回归进入中介、调节、交互项、简单斜率和 Bootstrap 间接效应。',
+        modules: ['相关与回归', '层级回归', '交互项与简单斜率', '单中介', '链式中介', '调节与调节中介', 'Bootstrap 间接效应与结果写作']
+      },
+      {
+        key: 'mixed-models',
+        name: '混合效应模型与重复测量数据',
+        status: '重复测量',
+        badge: 'lme4 / emmeans',
+        desc: '处理嵌套、重复测量与被试/项目双随机结构，承接模型后的边际均值与对比解释。',
+        modules: ['随机截距模型', '随机斜率模型', '重复测量与长格式数据', '被试/项目双随机结构', 'GLMM 入门', '模型比较与结果解释']
+      },
+      {
+        key: 'missing-data',
+        name: '缺失数据与多重插补',
+        status: '数据质量',
+        badge: 'mice',
+        desc: '围绕心理学数据常见缺失，训练缺失模式判断、删除法比较、多重插补与报告写法。',
+        modules: ['缺失模式判断', '删除法与插补法比较', 'mice 基本流程', '插补后汇总', '插补数据的结果报告']
+      },
+      {
+        key: 'power-analysis',
+        name: '功效分析与样本量设计',
+        status: '研究设计',
+        badge: 'simr',
+        desc: '把样本量估计前移到研究设计阶段，尤其支持复杂设计与混合模型的模拟功效分析。',
+        modules: ['基本功效分析概念', '常见设计样本量估计', '基于模型的模拟功效分析', '纵向/混合模型样本量思路', '研究计划中的写法']
+      }
+    ]
+  },
+  {
+    key: 'latent',
+    name: '潜变量与纵向研究',
+    order: '03',
+    description: '面向研究生层级和高阶方法训练，承接 SEM、纵向模型、测量等值与量表建模。',
+    topics: [
+      {
+        key: 'sem',
+        name: 'CFA、SEM 与测量等值性',
+        status: '潜变量模型',
+        badge: 'lavaan',
+        desc: '覆盖路径分析、CFA、SEM、多组 CFA、测量等值性、潜变量中介与模型修改。',
+        modules: ['路径分析', 'CFA', 'SEM', '多组 CFA', '测量等值性', '潜变量中介', '拟合指标与模型修改']
+      },
+      {
+        key: 'longitudinal',
+        name: '纵向模型专题',
+        status: '可进入训练',
+        badge: 'CLPM / RI-CLPM / LGM',
+        desc: '围绕多波追踪数据，训练交叉滞后、随机截距、增长轨迹、纵向中介与多组纵向比较。',
+        modules: ['交叉滞后模型（CLPM）', '随机截距交叉滞后模型（RI-CLPM）', '潜在增长模型（LGM）', '纵向中介', '多组纵向模型']
+      },
+      {
+        key: 'measurement',
+        name: '心理测量与量表建模',
+        status: '测量建模',
+        badge: 'EFA / CFA / IRT',
+        desc: '承接量表开发、题项筛选、因子结构分析、IRT 入门和量表质量报告。',
+        modules: ['EFA', 'CFA 与 EFA 衔接', '题项分析', '量表修订', 'IRT 入门', '报告量表质量']
+      }
+    ]
+  },
+  {
+    key: 'advanced',
+    name: '研究拓展与复现',
+    order: '04',
+    description: '面向更复杂的研究问题，延伸到网络分析、证据综合和可重复研究工作流。',
+    topics: [
+      {
+        key: 'network',
+        name: '网络心理测量',
+        status: '网络分析',
+        badge: 'qgraph / bootnet',
+        desc: '训练网络估计、中心性指标、稳定性与精确性检验，以及规范结果表述。',
+        modules: ['网络心理测量基本概念', '网络估计', '中心性指标', '稳定性与精确性检验', '网络结果的规范表述']
+      },
+      {
+        key: 'meta',
+        name: '元分析与证据综合',
+        status: '证据综合',
+        badge: 'metafor',
+        desc: '覆盖效应量计算、固定/随机效应模型、森林图、漏斗图、调节变量和 meta-regression。',
+        modules: ['效应量计算', '固定效应与随机效应', 'forest plot 与 funnel plot', '调节变量分析', 'meta-regression', '元分析结果报告']
+      },
+      {
+        key: 'reproducible',
+        name: '可重复研究与动态报告',
+        status: '研究工作流',
+        badge: 'Quarto / renv',
+        desc: '用 Quarto 和 renv 训练从代码、正文、图表到环境快照的一体化可重复研究工作流。',
+        modules: ['Quarto 基础', 'R 代码与正文联动', '自动生成图表和结果', '项目环境快照与恢复', '可重复研究工作流']
+      }
+    ]
+  }
+];
+
+const LONGITUDINAL_TOPICS = [
+  { key: 'clpm', title: 'CLPM', fullName: '交叉滞后模型', desc: '作为纵向分析入门，对比传统交叉滞后路径的解释。', status: '基础模型' },
+  { key: 'riclpm', title: 'RI-CLPM', fullName: '随机截距交叉滞后模型', desc: '聚焦 within / between 分离，训练更清晰的纵向效应解释。', status: '进入训练' },
+  { key: 'lgm', title: 'LGM', fullName: '潜在增长模型', desc: '描述随时间变化的轨迹与个体差异。', status: '发展轨迹' },
+  { key: 'longitudinal-mediation', title: '纵向中介', fullName: '跨时间中介链', desc: '训练跨时间中介链与间接效应写作。', status: '机制解释' },
+  { key: 'multi-group-longitudinal', title: '多组纵向模型', fullName: '组间纵向路径比较', desc: '处理不同组别的纵向路径比较。', status: '组间比较' }
+];
+
+const TRAINING_TEMPLATE = [
+  '研究问题',
+  '数据处理',
+  '模型代码',
+  '结果解读',
+  '论文表述',
+  '综合练习'
+];
+
 const MODULE_DATA = {
   1: {
     title: '研究问题与设计识别',

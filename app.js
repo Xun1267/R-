@@ -69,6 +69,26 @@ function buildDefaultProfile(username) {
   };
 }
 
+function getRiclpmProgress(p) {
+  if (!p) return { completedModules: [], completedQuestions: [], mastery: { concepts:0, code:0, output:0, writing:0 } };
+  p.topicProgress = p.topicProgress || {};
+  p.topicProgress.riclpm = p.topicProgress.riclpm || {
+    completedModules: [],
+    completedQuestions: [],
+    mastery: { concepts:0, code:0, output:0, writing:0 }
+  };
+  return p.topicProgress.riclpm;
+}
+
+function getAllTopics() {
+  return SITE_ARCHITECTURE.flatMap(group => group.topics.map(topic => ({ ...topic, groupKey: group.key, groupName: group.name })));
+}
+
+function getTopicLabel(key) {
+  const topic = getAllTopics().find(item => item.key === key);
+  return topic ? topic.name : key;
+}
+
 function createProfile() {
   const name = $('input-username').value.trim() || '研究者';
   if (loadProfile()) {
@@ -144,11 +164,14 @@ function exportProfile() {
 function exportTopicRecord() {
   const p = loadProfile();
   if (!p) { showToast('请先创建学习档案', 'warning'); return; }
+  const riclpmProgress = getRiclpmProgress(p);
   const record = {
     username: p.profile.username,
     profileId: p.profile.profileId,
     exportedAt: now(),
-    topicProgress: p.topicProgress,
+    topic: 'riclpm',
+    topicName: '随机截距交叉滞后模型（RI-CLPM）',
+    topicProgress: riclpmProgress,
     attempts: p.attempts.filter(a => a.topic === 'riclpm')
   };
   const blob = new Blob([JSON.stringify(record, null, 2)], { type:'application/json' });
@@ -181,21 +204,14 @@ function confirmResetProfile() {
 ============================================================ */
 const PAGES = ['home','profile','topicmap','module','workspace','feedback','progress'];
 let currentPage = 'home';
-let currentModuleId  = 1;
+let currentModuleId  = null;
 let currentQuestionId = 1;
+const PAGE_TRANSITION_MS = 260;
+let pageTransitionTimer = null;
 
 function goPage(name) {
-  PAGES.forEach(id => {
-    const el = $('page-' + id);
-    if (el) el.classList.remove('active');
-  });
   const target = $('page-' + name);
-  if (target) target.classList.add('active');
-  currentPage = name;
-
-  document.querySelectorAll('[data-nav]').forEach(el => {
-    el.classList.toggle('active', el.dataset.nav === name);
-  });
+  if (!target) return;
 
   const hooks = {
     home:      refreshHomePage,
@@ -204,7 +220,53 @@ function goPage(name) {
   };
   if (hooks[name]) hooks[name]();
 
-  window.scrollTo(0,0);
+  document.querySelectorAll('[data-nav]').forEach(el => {
+    el.classList.toggle('active', el.dataset.nav === name);
+  });
+
+  const previous = $('page-' + currentPage);
+  const isSamePage = currentPage === name && target.classList.contains('active');
+  const reduceMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (pageTransitionTimer) clearTimeout(pageTransitionTimer);
+
+  if (isSamePage || reduceMotion) {
+    PAGES.forEach(id => {
+      const el = $('page-' + id);
+      if (!el) return;
+      el.classList.remove('is-exiting', 'page-entering');
+      el.classList.toggle('active', id === name);
+    });
+    currentPage = name;
+    window.scrollTo(0, 0);
+    return;
+  }
+
+  document.querySelectorAll('.page.is-exiting').forEach(el => {
+    if (el !== previous) el.classList.remove('is-exiting');
+  });
+
+  if (previous && previous !== target) {
+    previous.classList.remove('active', 'page-entering');
+    previous.classList.add('is-exiting');
+  }
+
+  PAGES.forEach(id => {
+    const el = $('page-' + id);
+    if (!el || el === target || el === previous) return;
+    el.classList.remove('active', 'is-exiting', 'page-entering');
+  });
+
+  target.classList.remove('is-exiting', 'page-entering');
+  target.classList.add('active', 'page-entering');
+  window.scrollTo(0, 0);
+
+  currentPage = name;
+  pageTransitionTimer = setTimeout(() => {
+    document.querySelectorAll('.page.is-exiting').forEach(el => el.classList.remove('is-exiting'));
+    target.classList.remove('page-entering');
+  }, PAGE_TRANSITION_MS + 80);
 }
 
 /* ============================================================
@@ -228,7 +290,13 @@ function refreshHomePage() {
 
 function calcTopicPct(p) {
   if (!p) return 0;
-  const done = (p.topicProgress.riclpm.completedQuestions || []).length;
+  const done = (getRiclpmProgress(p).completedQuestions || []).length;
+  return Math.round(done / 16 * 100);
+}
+
+function calcPlatformPct(p) {
+  if (!p) return 0;
+  const done = (getRiclpmProgress(p).completedQuestions || []).length;
   return Math.round(done / 16 * 100);
 }
 
@@ -248,9 +316,74 @@ function handleStartTraining() {
 ============================================================ */
 function refreshTopicMapPage() {
   const p = loadProfile();
-  const done = p ? (p.topicProgress.riclpm.completedQuestions||[]).length : 0;
+  const allTopics = getAllTopics();
+  const done = p ? (getRiclpmProgress(p).completedQuestions || []).length : 0;
   $('stat-done').textContent = done;
-  $('stat-pct').textContent  = Math.round(done/16*100) + '%';
+  $('stat-pct').textContent  = Math.round(done / 16 * 100) + '%';
+
+  const topicStats = document.querySelectorAll('.topicmap-stats .stat-item__num');
+  if (topicStats[0]) topicStats[0].textContent = allTopics.length;
+  if (topicStats[1]) topicStats[1].textContent = LONGITUDINAL_TOPICS.length;
+
+  const container = $('topic-catalog-grid');
+  if (container) {
+    container.innerHTML = `
+      ${SITE_ARCHITECTURE.map(group => `
+        <section class="architecture-group">
+          <div class="architecture-group__header">
+            <div>
+              <div class="architecture-group__eyebrow">${group.order} · ${group.key}</div>
+              <h3 class="architecture-group__title">${group.name}</h3>
+              <p class="architecture-group__desc">${group.description}</p>
+            </div>
+            <span class="architecture-group__count">${group.topics.length} 个专题</span>
+          </div>
+          <div class="architecture-group__grid">
+            ${group.topics.map(topic => {
+              const progress = topic.key === 'longitudinal' ? Math.round(done / 16 * 100) : null;
+              return `
+              <button class="architecture-card ${topic.key === 'longitudinal' ? 'architecture-card--active' : ''}" type="button" onclick="openTopic('${topic.key}')">
+                <div class="architecture-card__top">
+                  <span class="architecture-card__badge ${topic.status.includes('已') ? 'architecture-card__badge--live' : ''}">${topic.status}</span>
+                  <span class="architecture-card__chip">${topic.badge}</span>
+                </div>
+                <div class="architecture-card__name">${topic.name}</div>
+                <p class="architecture-card__desc">${topic.desc}</p>
+                <div class="architecture-card__modules">
+                  ${topic.modules.slice(0, 4).map(module => `<span>${module}</span>`).join('')}
+                </div>
+                <div class="architecture-card__foot">
+                  <span>${topic.modules.length} 个训练模块</span>
+                  <span>${progress !== null ? progress + '% 已完成' : '专题概览'}</span>
+                </div>
+              </button>
+            `;
+            }).join('')}
+          </div>
+        </section>
+      `).join('')}
+      <section class="longitudinal-panel" id="longitudinal-subtopics">
+        <div class="longitudinal-panel__header">
+          <div>
+            <div class="architecture-group__eyebrow">纵向模型专题 · 二级路径</div>
+            <h3 class="architecture-group__title">从 CLPM 到 RI-CLPM，再到 LGM 与纵向中介</h3>
+            <p class="architecture-group__desc">这一组专题聚焦多波追踪数据中的稳定差异、个体内变化、发展轨迹和跨时间机制解释。</p>
+          </div>
+          <button class="btn btn--primary btn--sm" type="button" onclick="openLongitudinalSubtopic('riclpm')">进入 RI-CLPM</button>
+        </div>
+        <div class="longitudinal-subgrid">
+          ${LONGITUDINAL_TOPICS.map(topic => `
+            <button class="longitudinal-card ${topic.key === 'riclpm' ? 'longitudinal-card--live' : ''}" type="button" onclick="openLongitudinalSubtopic('${topic.key}')">
+              <span class="longitudinal-card__status">${topic.status}</span>
+              <strong>${topic.title}</strong>
+              <small>${topic.fullName}</small>
+              <p>${topic.desc}</p>
+            </button>
+          `).join('')}
+        </div>
+      </section>
+    `;
+  }
 
   for (let i = 1; i <= 8; i++) {
     const modDone = p ? getModuleDoneCount(p, i) : 0;
@@ -263,8 +396,28 @@ function refreshTopicMapPage() {
 }
 
 function getModuleDoneCount(p, modId) {
-  const done = p.topicProgress.riclpm.completedQuestions || [];
+  const done = getRiclpmProgress(p).completedQuestions || [];
   return done.filter(q => q.startsWith(`m${modId}_`)).length;
+}
+
+function openTopic(key) {
+  if (key === 'longitudinal') {
+    const panel = $('longitudinal-subtopics');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  showToast(`${getTopicLabel(key)}：当前展示专题概览`, 'default');
+}
+
+function openLongitudinalSubtopic(key) {
+  if (key === 'riclpm') {
+    showToast('进入 RI-CLPM 模块选择', 'success');
+    renderModuleOverview();
+    goPage('module');
+    return;
+  }
+  const topic = LONGITUDINAL_TOPICS.find(item => item.key === key);
+  showToast(`${topic ? topic.fullName : key}：当前展示专题概览`, 'default');
 }
 
 function goModule(id) {
@@ -273,10 +426,88 @@ function goModule(id) {
   goPage('module');
 }
 
+function getModuleIds() {
+  return Object.keys(MODULE_DATA).map(Number).sort((a, b) => a - b);
+}
+
+function getModuleQuestionCount(mod) {
+  return mod.questions ? mod.questions.length : 0;
+}
+
+function getRiclpmDoneCount(p) {
+  return p ? (getRiclpmProgress(p).completedQuestions || []).length : 0;
+}
+
+function renderModuleOverview() {
+  currentModuleId = null;
+
+  const p = loadProfile();
+  const moduleIds = getModuleIds();
+  const totalQuestions = moduleIds.reduce((sum, id) => sum + getModuleQuestionCount(MODULE_DATA[id]), 0);
+  const done = getRiclpmDoneCount(p);
+  const pct = totalQuestions ? Math.round(done / totalQuestions * 100) : 0;
+
+  $('module-back-btn').textContent = '← 返回专题地图';
+  $('module-back-btn').onclick = () => goPage('topicmap');
+  $('mod-eyebrow').textContent = 'RI-CLPM 专题';
+  $('mod-title').textContent = '选择训练模块';
+  $('mod-badges').innerHTML = `
+    <span class="badge badge--green">自由选择</span>
+    <span class="badge badge--purple">${moduleIds.length} 个模块</span>
+    <span class="badge badge--orange">${totalQuestions} 道题</span>
+  `;
+  $('mod-score-display').textContent = pct + '%';
+  $('mod-objectives').innerHTML = [
+    '不需要按顺序解锁，可以直接进入当前最需要的模块',
+    '每个模块仍会保留独立完成度，方便回头补练',
+    '适合按研究问题、代码、输出解读或写作需求跳转学习'
+  ].map(o => `<div class="objective-item">${o}</div>`).join('');
+
+  $('module-content-title').textContent = '模块选择';
+  $('question-list-container').innerHTML = `
+    <div class="modules-grid modules-grid--selector">
+      ${moduleIds.map(id => {
+        const mod = MODULE_DATA[id];
+        const modDone = p ? getModuleDoneCount(p, id) : 0;
+        const questionCount = getModuleQuestionCount(mod);
+        const modPct = questionCount ? Math.round(modDone / questionCount * 100) : 0;
+        const levelClass = { '入门':'badge--green', '标准':'badge--orange', '进阶':'badge--red' }[mod.level] || 'badge--blue';
+        return `
+          <button class="module-card" type="button" onclick="goModule(${id})">
+            <div class="module-card__top">
+              <div class="module-card__num">MODULE ${String(id).padStart(2, '0')}</div>
+              <span class="badge ${levelClass}">${mod.level}</span>
+            </div>
+            <div class="module-card__title">${mod.title}</div>
+            <div class="module-card__desc">${mod.objectives[0]}</div>
+            <div class="module-card__meta">
+              ${mod.types.map(t => `<span class="tag">${t}</span>`).join('')}
+            </div>
+            <div class="module-card__footer">
+              <div style="min-width:0;flex:1;">
+                <div class="module-card__progress-label">${modDone}/${questionCount} 已完成</div>
+                <div class="progress-bar" style="height:5px;">
+                  <div class="progress-bar__fill" style="width:${modPct}%;"></div>
+                </div>
+              </div>
+              <span class="btn btn--secondary btn--sm">进入</span>
+            </div>
+          </button>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
 function renderModuleDetail(id) {
   const mod = MODULE_DATA[id];
   if (!mod) return;
 
+  $('module-back-btn').textContent = '← 返回模块选择';
+  $('module-back-btn').onclick = () => {
+    renderModuleOverview();
+    goPage('module');
+  };
   $('mod-eyebrow').textContent  = `MODULE 0${id}`;
   $('mod-title').textContent    = mod.title;
 
@@ -293,10 +524,11 @@ function renderModuleDetail(id) {
   const done = p ? getModuleDoneCount(p, id) : 0;
   const pct = Math.round(done / mod.questions.length * 100);
   $('mod-score-display').textContent = pct + '%';
+  $('module-content-title').textContent = '题目列表';
 
   const container = $('question-list-container');
   container.innerHTML = mod.questions.map((q, idx) => {
-    const isDone = p && (p.topicProgress.riclpm.completedQuestions||[]).includes(q.id);
+    const isDone = p && (getRiclpmProgress(p).completedQuestions || []).includes(q.id);
     const attempt = p ? p.attempts.filter(a => a.questionId === q.id) : [];
     const bestScore = attempt.length ? Math.max(...attempt.map(a => a.totalScore)) : null;
 
@@ -563,7 +795,7 @@ function submitAnswer() {
 
   p.attempts.push(submission);
 
-  const doneList = p.topicProgress.riclpm.completedQuestions;
+  const doneList = getRiclpmProgress(p).completedQuestions;
   if (!doneList.includes(qid) && scores.total >= 60) {
     doneList.push(qid);
   }
@@ -679,6 +911,7 @@ function nextQuestion() {
     goPage('workspace');
   } else {
     showToast('本模块已完成，返回模块列表选择下一模块', 'success');
+    renderModuleOverview();
     goPage('module');
   }
 }
@@ -701,7 +934,7 @@ function refreshProgressPage() {
   $('prog-created').textContent  = '创建于 ' + formatDate(p.profile.createdAt);
   $('prog-last').textContent     = '上次使用 ' + formatDate(p.profile.lastUsedAt);
 
-  const done = (p.topicProgress.riclpm.completedQuestions||[]).length;
+  const done = (getRiclpmProgress(p).completedQuestions || []).length;
   const pct  = Math.round(done/16*100);
   $('prog-overall-pct').textContent = pct + '%';
   $('prog-overall-bar').style.width = pct + '%';
