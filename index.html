@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PsyR Lab：心理学数据分析与 R 实训平台</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- ============================================================
+     TOAST CONTAINER
+============================================================ -->
+<div id="toast-container"></div>
+
+<!-- ============================================================
+     MODAL — 确认弹窗
+============================================================ -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal">
+    <h3 id="modal-title" style="font-size:18px;font-weight:800;margin-bottom:10px;">确认操作</h3>
+    <p  id="modal-body"  style="font-size:14px;color:var(--text-secondary);margin-bottom:24px;line-height:1.6;"></p>
+    <div class="flex gap-8" style="justify-content:flex-end;">
+      <button class="btn btn--secondary" onclick="closeModal()">取消</button>
+      <button class="btn btn--primary"   id="modal-confirm-btn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     NAV 顶部导航
+============================================================ -->
+<nav class="nav" id="main-nav">
+  <div class="nav__logo" onclick="goPage('home')">
+    <div class="nav__logo-icon">PsyR</div>
+    <div class="nav__logo-copy">
+      <div class="nav__logo-text">PsyR Lab</div>
+      <div class="nav__logo-sub">心理学数据分析与 R 实训平台</div>
+    </div>
+  </div>
+
+  <div class="nav__links">
+    <button class="nav__link active" data-nav="home"     onclick="goPage('home')">首页</button>
+    <button class="nav__link"        data-nav="topicmap" onclick="goPage('topicmap')">专题地图</button>
+    <button class="nav__link"        data-nav="progress" onclick="goPage('progress')">学习记录</button>
+  </div>
+
+  <div class="nav__actions">
+    <div class="nav__profile-btn" id="nav-profile-btn" onclick="handleNavProfile()">
+      <div class="nav__avatar" id="nav-avatar">?</div>
+      <span id="nav-username">未登录</span>
+    </div>
+  </div>
+</nav>
+
+<!-- ============================================================
+     PAGE 1 — 首页 HOME
+============================================================ -->
+<div class="page active" id="page-home">
+
+  <!-- 英雄区 -->
+  <section class="hero container container--narrow" style="margin:0 auto;">
+    <div class="hero__eyebrow">
+      <span class="hero__eyebrow-dot"></span>
+      通知📢 · RI-CLPM 专题已开放
+    </div>
+    <h1 class="hero__title">
+      <span class="hero__title-brand">PsyR Lab</span>
+      <span class="hero__title-sub">心理学数据分析与 R 实训平台</span>
+    </h1>
+    <p class="hero__subtitle">
+      本系统面向心理学研究与数据分析训练，提供题目练习、R 代码实训、结果识别、结论写作、分层反馈与学习记录保存等功能，支持学习者全面提升研究方法、统计分析与学术表达能力。
+    </p>
+    <div class="hero__actions">
+      <button class="btn btn--primary btn--lg" onclick="handleStartTraining()">
+        <span class="btn__icon">🚀</span>
+        <span class="btn__label">开始训练</span>
+      </button>
+      <button class="btn btn--secondary btn--lg" onclick="goPage('profile')">
+        <span class="btn__icon">👤</span>
+        <span class="btn__label">创建学习档案</span>
+      </button>
+      <button class="btn btn--ghost btn--lg" onclick="triggerImport()">
+        <span class="btn__icon">📂</span>
+        <span class="btn__label">导入学习记录</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="home-dashboard container">
+    <!-- 当前进度卡片（有档案时显示） -->
+    <div class="home-progress" id="home-progress-card">
+      <div class="home-progress__eyebrow">学习总览</div>
+      <div class="home-progress__top">
+        <div>
+          <div class="home-progress__title">欢迎回来</div>
+          <div class="home-progress__name" id="home-progress-name">研究者</div>
+          <div class="home-progress__desc">当前已进入 RI-CLPM 专题训练阶段，可以继续完成模块、查看反馈记录并追踪整体掌握度。</div>
+        </div>
+        <div class="home-progress__actions">
+          <button class="btn btn--primary btn--sm" onclick="goPage('topicmap')">继续训练 →</button>
+          <button class="btn btn--secondary btn--sm" onclick="goPage('progress')">查看记录</button>
+        </div>
+      </div>
+      <div class="home-progress__stats">
+        <div class="home-stat">
+          <div class="home-stat__label">当前专题</div>
+          <div class="home-stat__value">RI-CLPM</div>
+        </div>
+        <div class="home-stat">
+          <div class="home-stat__label">学习状态</div>
+          <div class="home-stat__value">进行中</div>
+        </div>
+        <div class="home-stat">
+          <div class="home-stat__label">当前完成度</div>
+          <div class="home-stat__value" id="home-progress-pct">0%</div>
+        </div>
+      </div>
+      <div>
+        <div class="home-progress__bar-head">
+          <span>专题完成度</span>
+          <span id="home-progress-pct-inline">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-bar__fill" id="home-progress-bar" style="width:0%;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 当前专题说明 -->
+    <div class="topics-available">
+      <div class="topics-available__label">已开放专题</div>
+      <p class="topics-available__desc">
+        当前版本以 RI-CLPM（随机截距交叉滞后面板模型）为核心训练主题，完整覆盖从研究问题识别到综合任务的全流程训练。
+      </p>
+      <div class="topics-available__grid">
+        <div class="topic-chip">
+          <div class="topic-chip__dot" style="background:var(--green);box-shadow:0 0 6px var(--green);"></div>
+          <div>
+            <div class="topic-chip__name">RI-CLPM 专题</div>
+            <div class="topic-chip__status">8 个模块 · 已开放</div>
+          </div>
+        </div>
+        <div class="topic-chip" style="opacity:0.56;">
+          <div class="topic-chip__dot" style="background:var(--text-muted);"></div>
+          <div>
+            <div class="topic-chip__name">R 基础语法</div>
+            <div class="topic-chip__status">敬请期待</div>
+          </div>
+        </div>
+        <div class="topic-chip" style="opacity:0.56;">
+          <div class="topic-chip__dot" style="background:var(--text-muted);"></div>
+          <div>
+            <div class="topic-chip__name">中介分析</div>
+            <div class="topic-chip__status">敬请期待</div>
+          </div>
+        </div>
+        <div class="topic-chip" style="opacity:0.56;">
+          <div class="topic-chip__dot" style="background:var(--text-muted);"></div>
+          <div>
+            <div class="topic-chip__name">结构方程模型</div>
+            <div class="topic-chip__status">敬请期待</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 特性卡片 -->
+  <div class="features container" style="margin-top:40px;">
+    <div class="feature-card">
+      <div class="feature-card__icon">🎯</div>
+      <div class="feature-card__title">训练研究问题意识</div>
+      <div class="feature-card__desc">理解 RI-CLPM 适用于什么问题，为什么需要这种模型，而不只是背代码。</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card__icon">💻</div>
+      <div class="feature-card__title">代码训练</div>
+      <div class="feature-card__desc">从 lavaan 语法到 RI-CLPM 骨架、中介与多组比较，逐步掌握完整代码能力。</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card__icon">📊</div>
+      <div class="feature-card__title">结果理解</div>
+      <div class="feature-card__desc">学会从输出中抓住拟合指标、路径系数、随机截距相关与间接效应。</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card__icon">✍️</div>
+      <div class="feature-card__title">论文表达训练</div>
+      <div class="feature-card__desc">将模型结果写成规范方法段和结果段，避免层面混淆与过度推断。</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card__icon">🔄</div>
+      <div class="feature-card__title">分层诊断反馈</div>
+      <div class="feature-card__desc">每道题提供四维评分与诊断式反馈，告诉你哪里对了、哪里还不稳定。</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-card__icon">💾</div>
+      <div class="feature-card__title">本地学习记录</div>
+      <div class="feature-card__desc">无需服务器账号，本地 JSON 档案保存全部练习历史，支持导入导出。</div>
+    </div>
+  </div>
+
+  <!-- 讲义入口占位 -->
+  <div class="handout-placeholder container">
+    <div class="handout-placeholder__icon">📄</div>
+    <div class="handout-placeholder__text">讲义联动入口（规划中）— 后续版本将在此接入配套讲义材料</div>
+  </div>
+
+  <!-- 版本说明 -->
+  <div class="version-footer container">
+    <div>版本 0.1.0 · 通知📢 · RI-CLPM 专题</div>
+    <div style="margin-top:4px;">数据本地存储 · 无需服务器 · 可离线使用</div>
+  </div>
+
+</div><!-- /page-home -->
+
+<!-- ============================================================
+     PAGE 2 — 创建学习档案 PROFILE SETUP
+============================================================ -->
+<div class="page" id="page-profile">
+  <div class="profile-card glass">
+    <div class="profile-card__header">
+      <div class="profile-card__icon">👤</div>
+      <div class="profile-card__title">创建学习档案</div>
+      <div class="profile-card__subtitle">本地档案，无需注册，数据仅存于你的设备</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label" for="input-username">你的名字 / 昵称</label>
+      <input class="form-input" id="input-username" type="text" placeholder="例如：研究者、小明、Lab_A" maxlength="20" />
+      <div class="form-hint">建议使用便于识别的名字，导出记录时将用作文件名前缀。</div>
+    </div>
+
+    <div class="mechanism-box">
+      <div class="mechanism-box__title">📌 档案机制说明</div>
+      <p>你的学习档案保存在本地浏览器 localStorage 中，包含用户名、题目完成情况、历史提交与掌握度统计。你可以随时导出 JSON 文件备份，或导入到其他设备继续学习。</p>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="form-group">
+      <label class="form-label">已有学习档案？导入 JSON 文件</label>
+      <div class="import-zone" onclick="triggerImport()">
+        <div class="import-zone__icon">📂</div>
+        <div class="import-zone__text">点击选择 JSON 档案文件，或将文件拖拽到此处</div>
+      </div>
+    </div>
+
+    <div class="flex gap-8" style="margin-top:24px;">
+      <button class="btn btn--secondary" style="flex:1;" onclick="goPage('home')">返回首页</button>
+      <button class="btn btn--primary"   style="flex:1;" onclick="createProfile()" id="btn-create-profile">创建档案</button>
+    </div>
+  </div>
+</div><!-- /page-profile -->
+
+<!-- ============================================================
+     PAGE 3 — 专题地图 TOPIC MAP
+============================================================ -->
+<div class="page" id="page-topicmap">
+
+  <!-- 头部 -->
+  <div class="topicmap-header container">
+    <div class="topicmap-header__eyebrow">RI-CLPM 专题</div>
+    <div class="topicmap-header__title">随机截距交叉滞后面板模型</div>
+    <div class="topicmap-header__sub">
+      8 个训练模块，覆盖研究问题识别、代码训练、结果解释到综合任务，完整打通 RI-CLPM 训练闭环。
+    </div>
+    <div class="topicmap-stats">
+      <div class="stat-item"><div class="stat-item__num">8</div><div class="stat-item__label">模块</div></div>
+      <div class="stat-item"><div class="stat-item__num" id="stat-questions">16</div><div class="stat-item__label">题目</div></div>
+      <div class="stat-item"><div class="stat-item__num" id="stat-done">0</div><div class="stat-item__label">已完成</div></div>
+      <div class="stat-item"><div class="stat-item__num" id="stat-pct">0%</div><div class="stat-item__label">完成度</div></div>
+    </div>
+  </div>
+
+  <!-- 模块卡片 -->
+  <div class="modules-grid container">
+
+    <!-- M1 -->
+    <div class="module-card" onclick="goModule(1)">
+      <div class="module-card__num">MODULE 01</div>
+      <div class="module-card__title">研究问题与设计识别</div>
+      <div class="module-card__desc">判断一个研究问题是否适合使用 RI-CLPM，理解纵向交叉滞后设计的前提条件。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--blue">判断题</span>
+        <span class="badge badge--green">入门</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="1">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="1" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M2 -->
+    <div class="module-card" onclick="goModule(2)">
+      <div class="module-card__num">MODULE 02</div>
+      <div class="module-card__title">个体间与个体内</div>
+      <div class="module-card__desc">区分 between-person 与 within-person 效应，理解随机截距的含义与解释差异。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--blue">多选题</span>
+        <span class="badge badge--green">入门</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="2">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="2" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M3 -->
+    <div class="module-card" onclick="goModule(3)">
+      <div class="module-card__num">MODULE 03</div>
+      <div class="module-card__title">lavaan 语法基础</div>
+      <div class="module-card__desc">掌握 lavaan 包的基本语法规则、回归运算符、残差定义与约束写法。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--purple">代码补全</span>
+        <span class="badge badge--orange">标准</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="3">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="3" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M4 -->
+    <div class="module-card" onclick="goModule(4)">
+      <div class="module-card__num">MODULE 04</div>
+      <div class="module-card__title">RI-CLPM 基础代码</div>
+      <div class="module-card__desc">搭建完整 RI-CLPM 骨架代码，包含随机截距定义、个体内变量分解与交叉滞后路径。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--purple">完整代码</span>
+        <span class="badge badge--orange">标准</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="4">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="4" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M5 -->
+    <div class="module-card" onclick="goModule(5)">
+      <div class="module-card__num">MODULE 05</div>
+      <div class="module-card__title">三变量与纵向中介</div>
+      <div class="module-card__desc">在三变量三波纵向设计中定义中介链，区分 within 层面的间接效应定义方式。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--purple">完整代码</span>
+        <span class="badge badge--red">进阶</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="5">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="5" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M6 -->
+    <div class="module-card" onclick="goModule(6)">
+      <div class="module-card__num">MODULE 06</div>
+      <div class="module-card__title">多组约束与释放</div>
+      <div class="module-card__desc">在多组 RI-CLPM 中进行参数约束与释放，理解组间不变性检验的代码逻辑。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--purple">代码补全</span>
+        <span class="badge badge--red">进阶</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="6">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="6" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M7 -->
+    <div class="module-card" onclick="goModule(7)">
+      <div class="module-card__num">MODULE 07</div>
+      <div class="module-card__title">输出结果解释</div>
+      <div class="module-card__desc">从 lavaan 输出中识别关键拟合指标、路径系数显著性与随机截距相关方向。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--blue">数值填写</span>
+        <span class="badge badge--orange">标准</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="7">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="7" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+    <!-- M8 -->
+    <div class="module-card" onclick="goModule(8)">
+      <div class="module-card__num">MODULE 08</div>
+      <div class="module-card__title">综合任务</div>
+      <div class="module-card__desc">从研究问题到代码编写、结果提取再到论文写作表述，完整打通 RI-CLPM 训练闭环。</div>
+      <div class="flex gap-8 wrap mb-12">
+        <span class="badge badge--purple">综合</span>
+        <span class="badge badge--red">进阶</span>
+        <span class="tag">2 题</span>
+      </div>
+      <div class="module-card__footer">
+        <div style="flex:1;">
+          <div class="module-card__progress-label">完成度 <span class="module-progress-pct" data-mod="8">0%</span></div>
+          <div class="progress-bar"><div class="progress-bar__fill module-progress-bar" data-mod="8" style="width:0%;"></div></div>
+        </div>
+        <button class="btn btn--secondary btn--sm" style="margin-left:12px;">进入 →</button>
+      </div>
+    </div>
+
+  </div><!-- /modules-grid -->
+</div><!-- /page-topicmap -->
+
+<!-- ============================================================
+     PAGE 4 — 模块详情 MODULE DETAIL
+============================================================ -->
+<div class="page" id="page-module">
+
+  <!-- 模块头部 -->
+  <div class="module-header container">
+    <button class="module-header__back" onclick="goPage('topicmap')">← 返回专题地图</button>
+    <div class="flex items-center gap-16 wrap">
+      <div style="flex:1;">
+        <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;" id="mod-eyebrow">MODULE 01</div>
+        <h2 class="module-header__title" id="mod-title">模块标题</h2>
+        <div class="flex gap-8 wrap mt-8" id="mod-badges"></div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:28px;font-weight:800;color:var(--accent);" id="mod-score-display">0%</div>
+        <div style="font-size:12px;color:var(--text-muted);">完成度</div>
+      </div>
+    </div>
+    <div class="module-header__objectives" id="mod-objectives"></div>
+  </div>
+
+  <!-- 题目列表 -->
+  <div class="questions-list container">
+    <div class="questions-list__title">题目列表</div>
+    <div id="question-list-container">
+      <!-- 动态生成 -->
+    </div>
+  </div>
+
+</div><!-- /page-module -->
+
+<!-- ============================================================
+     PAGE 5 — 做题页 TRAINING WORKSPACE
+============================================================ -->
+<div class="page" id="page-workspace">
+
+  <!-- 顶部工具栏 -->
+  <div class="workspace-topbar">
+    <button class="workspace-topbar__back" onclick="goPage('module')">← 返回模块</button>
+    <div class="workspace-topbar__title" id="ws-topbar-title">题目标题</div>
+    <div class="flex gap-8">
+      <span class="badge badge--blue" id="ws-qtype">判断题</span>
+      <span class="badge badge--orange" id="ws-qlevel">入门</span>
+    </div>
+    <div class="workspace-topbar__actions">
+      <button class="btn btn--secondary btn--sm" onclick="saveDraft()">💾 保存草稿</button>
+      <button class="btn btn--primary   btn--sm" onclick="submitAnswer()">提交答案 ✓</button>
+    </div>
+  </div>
+
+  <!-- 三栏主体 -->
+  <div class="workspace-body">
+
+    <!-- 左栏：题干 -->
+    <div class="ws-left">
+
+      <div class="q-title" id="ws-q-title">题目标题</div>
+
+      <div class="q-section" id="ws-scenario-section">
+        <span class="q-section__label">研究情境</span>
+        <div class="q-section__content" id="ws-scenario">
+          <!-- 动态 -->
+        </div>
+      </div>
+
+      <div class="q-section">
+        <span class="q-section__label">任务目标</span>
+        <ul class="task-list" id="ws-tasks">
+          <!-- 动态 -->
+        </ul>
+      </div>
+
+      <div class="q-section" id="ws-simoutput-section" style="display:none;">
+        <span class="q-section__label">模拟输出</span>
+        <pre class="sim-output" id="ws-simoutput"></pre>
+      </div>
+
+      <div class="q-section" id="ws-data-section">
+        <span class="q-section__label">数据与代码下载</span>
+        <div class="download-btns">
+          <div class="download-btn" onclick="downloadData()">
+            <div class="download-btn__icon">📊</div>
+            <div class="download-btn__info">
+              <div class="download-btn__name" id="ws-data-name">sim_data.csv</div>
+              <div class="download-btn__size">模拟纵向数据</div>
+            </div>
+            <span style="font-size:12px;color:var(--accent);">下载</span>
+          </div>
+          <div class="download-btn" onclick="downloadStarter()">
+            <div class="download-btn__icon">📝</div>
+            <div class="download-btn__info">
+              <div class="download-btn__name">starter_code.R</div>
+              <div class="download-btn__size">代码起点文件</div>
+            </div>
+            <span style="font-size:12px;color:var(--accent);">下载</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /ws-left -->
+
+    <!-- 中栏：作答区 -->
+    <div class="ws-center">
+
+      <!-- 判断题 -->
+      <div class="answer-section" id="ws-section-judge" style="display:none;">
+        <div class="answer-section__label">
+          <span class="answer-section__label-num">A</span>
+          判断
+        </div>
+        <div class="q-section__content mb-12" id="ws-judge-question" style="font-weight:600;line-height:1.6;"></div>
+        <div class="radio-group" id="ws-judge-options">
+          <label class="radio-option">
+            <input type="radio" name="judge" value="true" id="radio-true">
+            ✓ 正确
+          </label>
+          <label class="radio-option">
+            <input type="radio" name="judge" value="false" id="radio-false">
+            ✗ 错误
+          </label>
+        </div>
+      </div>
+
+      <!-- 多选题 -->
+      <div class="answer-section" id="ws-section-multi" style="display:none;">
+        <div class="answer-section__label">
+          <span class="answer-section__label-num">A</span>
+          多选（选出所有正确选项）
+        </div>
+        <div class="checkbox-group" id="ws-multi-options">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 代码输入区 -->
+      <div class="answer-section" id="ws-section-code">
+        <div class="answer-section__label">
+          <span class="answer-section__label-num" id="ws-code-num">B</span>
+          代码编写
+        </div>
+        <div class="code-editor-wrap">
+          <div class="code-editor-header">
+            <span class="code-editor-header__lang">R</span>
+            <div class="code-editor-header__actions">
+              <button class="code-editor-header__action" onclick="clearCode()">清空</button>
+              <button class="code-editor-header__action" onclick="copyCode()">复制</button>
+            </div>
+          </div>
+          <textarea class="code-editor-textarea" id="ws-code-input"
+            placeholder="# 在此输入你的 R 代码&#10;# 运行后将结果填写在下方数值区&#10;&#10;library(lavaan)&#10;"></textarea>
+        </div>
+        <div class="form-hint mt-8">在本地 RStudio 中运行代码后，将关键数值填写到下方。</div>
+      </div>
+
+      <!-- 数值填写区 -->
+      <div class="answer-section" id="ws-section-values">
+        <div class="answer-section__label">
+          <span class="answer-section__label-num" id="ws-val-num">C</span>
+          填写关键数值
+        </div>
+        <div class="value-grid" id="ws-value-grid">
+          <!-- 动态生成 -->
+        </div>
+      </div>
+
+      <!-- 文字表述区 -->
+      <div class="answer-section" id="ws-section-text">
+        <div class="answer-section__label">
+          <span class="answer-section__label-num" id="ws-text-num">D</span>
+          结论与表述
+        </div>
+        <div class="form-hint mb-8" id="ws-text-prompt">请用 1–3 句话描述主要结果，注意区分个体内与个体间层面。</div>
+        <textarea class="text-area" id="ws-text-input" placeholder="在此输入你的结论表述..." maxlength="800"></textarea>
+        <div class="char-count"><span id="ws-char-count">0</span> / 800</div>
+      </div>
+
+      <!-- 提交区 -->
+      <div class="submit-row">
+        <button class="btn btn--primary" onclick="submitAnswer()">提交答案 ✓</button>
+        <button class="btn btn--secondary" onclick="saveDraft()">💾 保存草稿</button>
+        <span class="submit-row__save" id="ws-save-status">未保存草稿</span>
+      </div>
+
+    </div><!-- /ws-center -->
+
+    <!-- 右栏：辅助区 -->
+    <div class="ws-right">
+
+      <!-- 提示系统 -->
+      <div class="hint-system">
+        <div class="hint-system__header">
+          <span>💡 提示</span>
+          <span class="text-xs text-muted" id="hint-used-count">0 / 4 已使用</span>
+        </div>
+
+        <button class="hint-btn" onclick="showHint(1)" id="hint-btn-1">
+          <span>🔹</span> 提示 1 · 方向提醒
+        </button>
+        <div class="hint-content" id="hint-content-1">
+          请检查你的研究问题是否涉及纵向数据与个体内变化，这是 RI-CLPM 的核心适用条件。
+        </div>
+
+        <button class="hint-btn" onclick="showHint(2)" id="hint-btn-2">
+          <span>🔸</span> 提示 2 · 关键区域
+        </button>
+        <div class="hint-content" id="hint-content-2">
+          注意区分随机截距部分（between）与个体内残差部分（within），两者定义方式不同。
+        </div>
+
+        <button class="hint-btn" onclick="showHint(3)" id="hint-btn-3">
+          <span>🔺</span> 提示 3 · 结构提示
+        </button>
+        <div class="hint-content" id="hint-content-3">
+          RI-CLPM 的 lavaan 代码通常分四部分：随机截距定义、个体内变量分解、自回归路径、交叉滞后路径。
+        </div>
+
+        <button class="hint-btn" onclick="showHint(4)" id="hint-btn-4">
+          <span>🔻</span> 最终解析 · 参考答案
+        </button>
+        <div class="hint-content" id="hint-content-4" style="background:var(--purple-dim);border-color:rgba(226,180,168,0.32);">
+          参考答案将在此显示。建议先独立作答后再查看。
+        </div>
+      </div>
+
+      <!-- 变量速查 -->
+      <div class="var-lookup">
+        <div class="var-lookup__title">变量速查</div>
+        <table class="var-table">
+          <thead>
+            <tr>
+              <th>变量</th>
+              <th>含义</th>
+              <th>波次</th>
+            </tr>
+          </thead>
+          <tbody id="var-table-body">
+            <tr><td>x1</td><td>焦虑 T1</td><td>Wave 1</td></tr>
+            <tr><td>x2</td><td>焦虑 T2</td><td>Wave 2</td></tr>
+            <tr><td>x3</td><td>焦虑 T3</td><td>Wave 3</td></tr>
+            <tr><td>y1</td><td>抑郁 T1</td><td>Wave 1</td></tr>
+            <tr><td>y2</td><td>抑郁 T2</td><td>Wave 2</td></tr>
+            <tr><td>y3</td><td>抑郁 T3</td><td>Wave 3</td></tr>
+            <tr><td>RI_x</td><td>随机截距 X</td><td>—</td></tr>
+            <tr><td>RI_y</td><td>随机截距 Y</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- webR 预留 -->
+      <div class="webr-placeholder">
+        <div class="webr-placeholder__icon">🔬</div>
+        <div class="webr-placeholder__text">浏览器内运行 R<br>（实验功能 · 即将推出）</div>
+      </div>
+
+    </div><!-- /ws-right -->
+
+  </div><!-- /workspace-body -->
+
+</div><!-- /page-workspace -->
+
+<!-- ============================================================
+     PAGE 6 — 反馈报告 FEEDBACK REPORT
+============================================================ -->
+<div class="page" id="page-feedback">
+
+  <!-- 头部 -->
+  <div class="feedback-header container">
+    <div class="feedback-header__info">
+      <div class="feedback-header__title" id="fb-title">反馈报告</div>
+      <div class="feedback-header__meta text-secondary" id="fb-meta">模块 · 题目类型 · 难度</div>
+      <div class="flex gap-8 wrap mt-12" id="fb-badges"></div>
+    </div>
+    <div class="feedback-header__score">
+      <div class="total-score-ring">
+        <div class="total-score-ring__num" id="fb-total-score">72</div>
+        <div class="total-score-ring__label">总分 / 100</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="feedback-body container">
+
+    <!-- 分项得分 -->
+    <div class="feedback-section">
+      <div class="feedback-section__title">
+        📊 分项得分
+      </div>
+      <div class="score-breakdown">
+        <div class="score-dim">
+          <div class="score-dim__name">代码结构</div>
+          <div class="score-dim__num text-accent" id="fb-score-code">18</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">数值结果</div>
+          <div class="score-dim__num text-green" id="fb-score-values">22</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">统计理解</div>
+          <div class="score-dim__num text-orange" id="fb-score-stat">18</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">表述质量</div>
+          <div class="score-dim__num text-purple" id="fb-score-text">14</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 已正确的部分 -->
+    <div class="feedback-section">
+      <div class="feedback-section__title">
+        ✅ 你已经做对了
+      </div>
+      <div class="feedback-list" id="fb-correct-list">
+        <div class="feedback-item">
+          <span class="feedback-item__icon">✅</span>
+          正确定义了随机截距 RI_x 和 RI_y。
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-item__icon">✅</span>
+          拟合指标 CFI 和 RMSEA 均在可接受范围内。
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-item__icon">✅</span>
+          正确提取了路径系数 β_yx 的数值。
+        </div>
+      </div>
+    </div>
+
+    <!-- 问题点 -->
+    <div class="feedback-section">
+      <div class="feedback-section__title">
+        ⚠️ 仍有问题的地方
+      </div>
+      <div class="feedback-list" id="fb-issues-list">
+        <div class="feedback-item">
+          <span class="feedback-item__icon">⚠️</span>
+          在结论表述中未明确说明这是"个体内层面"的效应，容易引起读者混淆。
+        </div>
+        <div class="feedback-item">
+          <span class="feedback-item__icon">⚠️</span>
+          代码中遗漏了对残差协方差的约束设定，可能导致模型收敛问题。
+        </div>
+      </div>
+    </div>
+
+    <!-- 为什么重要 -->
+    <div class="feedback-section">
+      <div class="feedback-section__title">
+        💡 为什么这会影响结论
+      </div>
+      <div class="feedback-list" id="fb-why-list">
+        <div class="feedback-item">
+          <span class="feedback-item__icon">💡</span>
+          不区分 within / between 层面直接说"X 预测 Y"，是 RI-CLPM 中最常见的错误表述，会被审稿人指出层面混淆问题。
+        </div>
+      </div>
+    </div>
+
+    <!-- 下一步建议 -->
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">
+        🎯 下一步建议
+      </div>
+      <div class="suggestion-list" id="fb-suggestion-list">
+        <div class="suggestion-item">
+          <span class="suggestion-item__icon">📖</span>
+          回顾模块 2"个体间与个体内"的概念区分，重点理解 within-person 效应的表述规范。
+        </div>
+        <div class="suggestion-item">
+          <span class="suggestion-item__icon">💻</span>
+          在模块 4 的下一道题中，尝试加入残差协方差约束，观察模型拟合变化。
+        </div>
+        <div class="suggestion-item">
+          <span class="suggestion-item__icon">✍️</span>
+          练习完整结果段写作：先说拟合，再说路径，最后区分 within / between 层面描述。
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /feedback-body -->
+
+  <!-- 操作按钮 -->
+  <div class="feedback-actions container">
+    <button class="btn btn--secondary" onclick="retryQuestion()">🔄 重新作答</button>
+    <button class="btn btn--ghost"     onclick="goPage('module')">← 返回模块</button>
+    <button class="btn btn--primary"   onclick="nextQuestion()" id="fb-next-btn">下一题 →</button>
+    <button class="btn btn--success"   onclick="exportCurrentRecord()" style="margin-left:auto;">💾 导出本题记录</button>
+  </div>
+
+</div><!-- /page-feedback -->
+
+<!-- ============================================================
+     PAGE 7 — 学习记录 PROGRESS DASHBOARD
+============================================================ -->
+<div class="page" id="page-progress">
+
+  <!-- 头部 -->
+  <div class="progress-header container">
+    <div class="progress-avatar" id="prog-avatar">R</div>
+    <div class="progress-header__info">
+      <div class="progress-header__name" id="prog-username">研究者</div>
+      <div class="progress-header__meta">
+        <span id="prog-id">ID: ——</span> ·
+        <span id="prog-created">创建于 ——</span> ·
+        <span id="prog-last">上次使用 ——</span>
+      </div>
+    </div>
+    <div class="progress-header__actions">
+      <button class="btn btn--secondary btn--sm" onclick="goPage('topicmap')">继续训练</button>
+    </div>
+  </div>
+
+  <!-- 主体 -->
+  <div class="progress-body container">
+
+    <!-- 专题概览 -->
+    <div class="progress-section progress-section--full">
+      <div class="progress-section__title">专题概览 · RI-CLPM</div>
+      <div class="flex justify-between items-center mb-8">
+        <span class="text-sm text-secondary">总完成度</span>
+        <span class="text-sm text-accent font-bold" id="prog-overall-pct">0%</span>
+      </div>
+      <div class="progress-bar" style="height:8px;margin-bottom:20px;">
+        <div class="progress-bar__fill" id="prog-overall-bar" style="width:0%;"></div>
+      </div>
+
+      <!-- 8 个模块的小进度条 -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;" id="prog-module-grid">
+        <!-- 动态生成 -->
+      </div>
+    </div>
+
+    <!-- 掌握度 -->
+    <div class="progress-section">
+      <div class="progress-section__title">掌握度</div>
+      <div class="mastery-grid">
+        <div class="mastery-item">
+          <div class="mastery-item__label">概念理解</div>
+          <div class="mastery-item__val" id="prog-m-concept">0%</div>
+          <div class="progress-bar"><div class="progress-bar__fill" id="prog-m-concept-bar" style="width:0%;"></div></div>
+        </div>
+        <div class="mastery-item">
+          <div class="mastery-item__label">代码能力</div>
+          <div class="mastery-item__val text-purple" id="prog-m-code">0%</div>
+          <div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--purple);" id="prog-m-code-bar"></div></div>
+        </div>
+        <div class="mastery-item">
+          <div class="mastery-item__label">结果解读</div>
+          <div class="mastery-item__val text-green" id="prog-m-output">0%</div>
+          <div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--green);" id="prog-m-output-bar"></div></div>
+        </div>
+        <div class="mastery-item">
+          <div class="mastery-item__label">写作表述</div>
+          <div class="mastery-item__val text-orange" id="prog-m-writing">0%</div>
+          <div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--orange);" id="prog-m-writing-bar"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 错误类型统计 -->
+    <div class="progress-section">
+      <div class="progress-section__title">错误类型统计</div>
+      <div class="error-list" id="prog-error-list">
+        <div class="error-item">
+          <span class="error-item__label">层面混淆（within/between）</span>
+          <div class="error-item__bar"><div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--red);"></div></div></div>
+          <span class="error-item__count">0</span>
+        </div>
+        <div class="error-item">
+          <span class="error-item__label">代码结构缺失</span>
+          <div class="error-item__bar"><div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--red);"></div></div></div>
+          <span class="error-item__count">0</span>
+        </div>
+        <div class="error-item">
+          <span class="error-item__label">数值提取错误</span>
+          <div class="error-item__bar"><div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--red);"></div></div></div>
+          <span class="error-item__count">0</span>
+        </div>
+        <div class="error-item">
+          <span class="error-item__label">过度因果化表述</span>
+          <div class="error-item__bar"><div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--red);"></div></div></div>
+          <span class="error-item__count">0</span>
+        </div>
+        <div class="error-item">
+          <span class="error-item__label">拟合判断错误</span>
+          <div class="error-item__bar"><div class="progress-bar"><div class="progress-bar__fill" style="width:0%;background:var(--red);"></div></div></div>
+          <span class="error-item__count">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 最近练习记录 -->
+    <div class="progress-section progress-section--full">
+      <div class="progress-section__title">最近练习记录</div>
+      <div class="recent-list" id="prog-recent-list">
+        <div style="text-align:center;padding:32px;color:var(--text-muted);font-size:13px;">
+          暂无练习记录。完成第一道题后将在此显示。
+        </div>
+      </div>
+    </div>
+
+    <!-- 导入导出 -->
+    <div class="progress-section progress-section--full">
+      <div class="progress-section__title">学习档案 · 导入导出</div>
+      <div class="io-row">
+        <button class="btn btn--primary" onclick="exportProfile()">📤 导出完整学习档案</button>
+        <button class="btn btn--secondary" onclick="triggerImport()">📂 导入学习档案</button>
+        <button class="btn btn--secondary" onclick="exportTopicRecord()">📋 导出本专题记录</button>
+        <button class="btn btn--danger" style="margin-left:auto;" onclick="confirmResetProfile()">🗑️ 重置档案</button>
+      </div>
+      <div class="form-hint mt-8">
+        导出的 JSON 文件包含你的全部练习历史，可在其他设备导入继续学习，或提交给老师统一收集。
+      </div>
+    </div>
+
+  </div><!-- /progress-body -->
+
+</div><!-- /page-progress -->
+
+<!-- 隐藏文件输入 -->
+<input type="file" id="file-import-input" accept=".json" style="display:none;" onchange="handleImportFile(event)" />
+
+<!-- ============================================================
+     JAVASCRIPT
+============================================================ -->
+<script src="data.js"></script>
+<script src="app.js"></script>
+<
