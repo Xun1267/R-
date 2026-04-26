@@ -708,6 +708,7 @@ const QUESTION_DATA = {
     title:    '搭建双变量三波 RI-CLPM 骨架',
     type:     'code',
     level:    '标准',
+    feedbackMode: 'module4_check_report',
     scenario: `使用模拟数据（anxiety_depression_3wave.csv），在 lavaan 中搭建一个双变量（焦虑 x、抑郁 y）三波（T1/T2/T3）的 RI-CLPM 模型。数据已生成，请在本地 R 中运行代码，并将关键结果填写到下方。`,
     tasks:    [
       '定义随机截距 RI_x 和 RI_y（用 =~ 指向三个时间点）',
@@ -719,7 +720,36 @@ const QUESTION_DATA = {
     judgeQ:   null,
     answer: {
       code_keywords: ['RI_x =~', 'RI_y =~', 'wx', 'wy', '~~'],
-      values: { cfi: [0.94, 1.00], rmsea: [0.00, 0.06], beta_yx: [-0.5, 0.5] }
+      values: { cfi: [0.965, 0.975], rmsea: [0.037, 0.047], beta_yx: [0.21, 0.25] },
+      referenceValues: {
+        cfi: { value: 0.970, tolerance: 0.005, closeTolerance: 0.015 },
+        rmsea: { value: 0.042, tolerance: 0.005, closeTolerance: 0.015 },
+        beta_yx: { value: 0.230, tolerance: 0.020, closeTolerance: 0.050 }
+      },
+      referenceCode:
+`model <- '
+  # 随机截距
+  RI_x =~ 1*x1 + 1*x2 + 1*x3
+  RI_y =~ 1*y1 + 1*y2 + 1*y3
+
+  # 个体内成分
+  wx1 =~ 1*x1; wx2 =~ 1*x2; wx3 =~ 1*x3
+  wy1 =~ 1*y1; wy2 =~ 1*y2; wy3 =~ 1*y3
+
+  # 固定观测变量残差方差
+  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3
+  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3
+
+  # 自回归路径
+  wx2 ~ a*wx1; wx3 ~ a*wx2
+  wy2 ~ b*wy1; wy3 ~ b*wy2
+
+  # 交叉滞后路径
+  wx2 ~ c*wy1; wx3 ~ c*wy2
+  wy2 ~ d*wx1; wy3 ~ d*wx2
+'
+fit <- lavaan(model, data = data, estimator = "ML", missing = "listwise", std.lv = FALSE)`,
+      referenceText: '模型拟合良好（CFI = 0.970，RMSEA = 0.042）。在个体内层面，焦虑相对自身平时水平更高时，会正向预测后一时间点抑郁相对自身平时水平的变化（β_yx = 0.23）。'
     },
     hints: [
       '随机截距的定义格式：RI_x =~ 1*x1 + 1*x2 + 1*x3',
@@ -733,6 +763,72 @@ const QUESTION_DATA = {
       { key:'beta_yx', label:'β_yx（焦虑→抑郁）' }
     ],
     textPrompt: '用1-2句话描述主要结果，注意区分是"个体内层面"的效应。',
+    simOutput: null,
+    dataName: 'anxiety_depression_3wave.csv'
+  },
+  m4_q2: {
+    title:    '加入残差协方差约束',
+    type:     'code',
+    level:    '标准',
+    feedbackMode: 'module4_check_report',
+    scenario: `在上一题 RI-CLPM 骨架的基础上，补充随机截距协方差与同波 within 成分协方差。请在 lavaan 模型中加入必要约束，运行模型后填写关键拟合指标和交叉滞后路径系数。`,
+    tasks: [
+      '保留 RI_x、RI_y 与 wx/wy 个体内成分定义',
+      '写出随机截距协方差 RI_x ~~ RI_y',
+      '写出三个同波 within 协方差：wx1 ~~ wy1、wx2 ~~ wy2、wx3 ~~ wy3',
+      '避免把不同时间点的 within 成分错误写成协方差',
+      '提取 CFI、RMSEA、β_yx，并用一句话说明同波协方差的作用'
+    ],
+    judgeQ: null,
+    answer: {
+      code_keywords: ['RI_x =~', 'RI_y =~', 'wx1 ~~ wy1', 'wx2 ~~ wy2', 'wx3 ~~ wy3', 'RI_x ~~ RI_y'],
+      values: { cfi: [0.973, 0.983], rmsea: [0.025, 0.035], beta_yx: [0.21, 0.25] },
+      referenceValues: {
+        cfi: { value: 0.978, tolerance: 0.005, closeTolerance: 0.015 },
+        rmsea: { value: 0.030, tolerance: 0.005, closeTolerance: 0.015 },
+        beta_yx: { value: 0.230, tolerance: 0.020, closeTolerance: 0.050 }
+      },
+      referenceCode:
+`model <- '
+  # 随机截距
+  RI_x =~ 1*x1 + 1*x2 + 1*x3
+  RI_y =~ 1*y1 + 1*y2 + 1*y3
+
+  # 个体内成分
+  wx1 =~ 1*x1; wx2 =~ 1*x2; wx3 =~ 1*x3
+  wy1 =~ 1*y1; wy2 =~ 1*y2; wy3 =~ 1*y3
+
+  # 固定观测变量残差方差
+  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3
+  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3
+
+  # 自回归与交叉滞后路径
+  wx2 ~ a*wx1; wx3 ~ a*wx2
+  wy2 ~ b*wy1; wy3 ~ b*wy2
+  wx2 ~ c*wy1; wx3 ~ c*wy2
+  wy2 ~ d*wx1; wy3 ~ d*wx2
+
+  # 协方差约束
+  RI_x ~~ RI_y
+  wx1 ~~ wy1
+  wx2 ~~ wy2
+  wx3 ~~ wy3
+'
+fit <- lavaan(model, data = data, estimator = "ML", missing = "listwise", std.lv = FALSE)`,
+      referenceText: '加入同波 within 协方差后，模型拟合更充分（CFI = 0.978，RMSEA = 0.030）。这些协方差用于控制同一时间点焦虑与抑郁的同步关联，交叉滞后路径仍应解释为个体内层面的跨时预测。'
+    },
+    hints: [
+      '随机截距协方差写作：RI_x ~~ RI_y，用来表示两个变量稳定个体间差异之间的关联。',
+      '同波 within 协方差写作：wx1 ~~ wy1、wx2 ~~ wy2、wx3 ~~ wy3。',
+      '不要把 wx1 ~~ wy2 这类跨波关系写成协方差；跨波关系应由自回归与交叉滞后路径表达。',
+      '参考数值：CFI = 0.978，RMSEA = 0.030，β_yx = 0.23。'
+    ],
+    values: [
+      { key:'cfi',     label:'CFI' },
+      { key:'rmsea',   label:'RMSEA' },
+      { key:'beta_yx', label:'β_yx（焦虑→抑郁）' }
+    ],
+    textPrompt: '用1-2句话说明加入同波协方差后，应如何解释模型拟合与交叉滞后路径。',
     simOutput: null,
     dataName: 'anxiety_depression_3wave.csv'
   },

@@ -985,7 +985,7 @@ function submitAnswer() {
   p.attempts.push(submission);
 
   const doneList = getRiclpmProgress(p).completedQuestions;
-  if (!doneList.includes(qid) && scores.total >= 60) {
+  if (!doneList.includes(qid) && isSubmissionComplete(q, scores)) {
     doneList.push(qid);
   }
   p.profile.lastUsedAt = now();
@@ -1015,8 +1015,18 @@ function validateAnswer(q, answers) {
   return '';
 }
 
+function isSubmissionComplete(q, scores) {
+  if (q && q.feedbackMode === 'module4_check_report') {
+    return !!(scores.module4Report && scores.module4Report.isComplete);
+  }
+  return scores.total >= 60;
+}
+
 function autoScore(q, answers) {
   if (!q) return { total:0, code:0, values:0, stat:0, text:0 };
+  if (q.feedbackMode === 'module4_check_report') {
+    return gradeModule4CheckReport(q, answers);
+  }
   if (q.answer && q.answer.graderType === 'slot_fill') {
     return gradeSlotFill(q, answers);
   }
@@ -1099,6 +1109,177 @@ function autoScore(q, answers) {
   return { total, code, values, stat, text, active };
 }
 
+function gradeModule4CheckReport(q, answers) {
+  const codeChecks = buildModule4CodeChecks(q, answers.code || '');
+  const valueChecks = buildModule4ValueChecks(q, answers.values || {});
+  const textChecks = buildModule4TextChecks(q, answers.text || '');
+
+  const codeOk = codeChecks.every(item => item.level !== 'missing' && item.level !== 'error');
+  const valuesOk = valueChecks.every(item => item.level === 'ok' || item.level === 'near');
+  const textOk = textChecks.quality !== 'needs';
+
+  const code = Math.round(codeChecks.filter(item => item.level === 'ok').length / codeChecks.length * 25);
+  const values = valueChecks.length
+    ? Math.round(valueChecks.filter(item => item.level === 'ok' || item.level === 'near').length / valueChecks.length * 25)
+    : 0;
+  const text = textChecks.score;
+  const total = Math.round((code / 25) * 45 + (values / 25) * 35 + (text / 25) * 20);
+
+  return {
+    total,
+    code,
+    values,
+    stat: 0,
+    text,
+    active: { code:true, values:true, stat:false, text:true },
+    module4Report: {
+      codeChecks,
+      valueChecks,
+      textChecks,
+      isComplete: codeOk && valuesOk && textOk,
+      checklist: buildModule4RevisionChecklist(codeChecks, valueChecks, textChecks)
+    }
+  };
+}
+
+function buildModule4CodeChecks(q, code) {
+  const checks = [
+    makeCodeCheck('随机截距 RI_x', hasMeasurement(code, 'RI_x', ['x1','x2','x3']),
+      '已检测到 RI_x 指向 x1-x3。', '未检测到 `RI_x =~ 1*x1 + 1*x2 + 1*x3` 或等价写法。'),
+    makeCodeCheck('随机截距 RI_y', hasMeasurement(code, 'RI_y', ['y1','y2','y3']),
+      '已检测到 RI_y 指向 y1-y3。', '未检测到 `RI_y =~ 1*y1 + 1*y2 + 1*y3` 或等价写法。'),
+    makeCodeCheck('within 成分 wx1-wx3', ['wx1','wx2','wx3'].every((lhs, i) => hasMeasurement(code, lhs, [`x${i+1}`])),
+      'wx1-wx3 定义完整。', '检测到 wx 相关语句不完整，请确认 wx1、wx2、wx3 都已定义。'),
+    makeCodeCheck('within 成分 wy1-wy3', ['wy1','wy2','wy3'].every((lhs, i) => hasMeasurement(code, lhs, [`y${i+1}`])),
+      'wy1-wy3 定义完整。', '检测到 wy 相关语句不完整，请确认 wy1、wy2、wy3 都已定义。'),
+    makeCodeCheck('固定观测变量方差为 0', ['x1','x2','x3','y1','y2','y3'].every(v => hasZeroVariance(code, v)),
+      '已固定 x/y 六个观测变量的残差方差。', '请补齐 `x1 ~~ 0*x1` 到 `y3 ~~ 0*y3` 这组固定方差语句。'),
+    makeCodeCheck('自回归路径', [
+      ['wx2','wx1'], ['wx3','wx2'], ['wy2','wy1'], ['wy3','wy2']
+    ].every(([lhs, rhs]) => hasRegression(code, lhs, rhs)),
+      '自回归路径已覆盖两个变量的相邻时间点。', '自回归路径不完整，请检查 wx2~wx1、wx3~wx2、wy2~wy1、wy3~wy2。'),
+    makeCodeCheck('交叉滞后路径', [
+      ['wx2','wy1'], ['wx3','wy2'], ['wy2','wx1'], ['wy3','wx2']
+    ].every(([lhs, rhs]) => hasRegression(code, lhs, rhs)),
+      '交叉滞后路径已覆盖两个方向和两个滞后间隔。', '交叉滞后路径不完整，请检查 wx2~wy1、wx3~wy2、wy2~wx1、wy3~wx2。')
+  ];
+
+  if (q && q.title && q.title.includes('残差协方差')) {
+    checks.push(
+      makeCodeCheck('随机截距协方差 RI_x ~~ RI_y', hasCovariance(code, 'RI_x', 'RI_y'),
+        '已写出 RI_x ~~ RI_y。', '请补上随机截距协方差 `RI_x ~~ RI_y`。'),
+      makeCodeCheck('同波协方差 wx1 ~~ wy1', hasCovariance(code, 'wx1', 'wy1'),
+        '已写出 wx1 ~~ wy1。', '请补上第一波同波 within 协方差 `wx1 ~~ wy1`。'),
+      makeCodeCheck('同波协方差 wx2 ~~ wy2', hasCovariance(code, 'wx2', 'wy2'),
+        '已写出 wx2 ~~ wy2。', '请补上第二波同波 within 协方差 `wx2 ~~ wy2`。'),
+      makeCodeCheck('同波协方差 wx3 ~~ wy3', hasCovariance(code, 'wx3', 'wy3'),
+        '已写出 wx3 ~~ wy3。', '请补上第三波同波 within 协方差 `wx3 ~~ wy3`。'),
+      makeCodeCheck('协方差位置放在同波', !hasOffWaveWithinCovariance(code),
+        '未检测到跨波 within 协方差误写。', '检测到类似 `wx1 ~~ wy2` 的跨波协方差；跨时间关系应写成回归路径。', 'error')
+    );
+  }
+
+  return checks;
+}
+
+function makeCodeCheck(label, ok, okMessage, missingMessage, failLevel = 'missing') {
+  return {
+    label,
+    status: ok ? '已完成' : (failLevel === 'error' ? '需修正' : '缺失'),
+    level: ok ? 'ok' : failLevel,
+    message: ok ? okMessage : missingMessage
+  };
+}
+
+function buildModule4ValueChecks(q, values) {
+  const refs = q.answer && q.answer.referenceValues ? q.answer.referenceValues : {};
+  return (q.values || []).map(v => {
+    const ref = refs[v.key];
+    const user = values[v.key];
+    if (!ref) return null;
+    if (user === null || user === undefined || Number.isNaN(user)) {
+      return { label: v.label, user: '未填写', reference: ref.value, diff: null, status: '未填写', level: 'missing', message: '请回到输出中重新提取该指标。' };
+    }
+    const diff = user - ref.value;
+    const abs = Math.abs(diff);
+    if (abs <= ref.tolerance) {
+      return { label: v.label, user, reference: ref.value, diff, status: '正确', level: 'ok', message: '与你的参考答案一致。' };
+    }
+    if (abs <= ref.closeTolerance) {
+      return { label: v.label, user, reference: ref.value, diff, status: '接近', level: 'near', message: `${diff > 0 ? '偏高' : '偏低'} ${formatMetric(Math.abs(diff))}，方向基本正确，请核对小数位或输出行。` };
+    }
+    return { label: v.label, user, reference: ref.value, diff, status: '有偏差', level: 'error', message: `${diff > 0 ? '偏高' : '偏低'} ${formatMetric(Math.abs(diff))}，建议回到 fitMeasures 或参数表重新定位。` };
+  }).filter(Boolean);
+}
+
+function buildModule4TextChecks(q, textValue) {
+  const text = (textValue || '').trim();
+  const hasWithin = /个体内|within|within-person/i.test(text);
+  const hasDirection = /焦虑|抑郁|x|y|wx|wy|预测|正向|负向|路径|β|beta/i.test(text);
+  const hasFit = /拟合|CFI|RMSEA|SRMR|TLI/i.test(text);
+  const overCausal = /导致|证明|因果|决定/.test(text);
+  const items = [
+    { label:'个体内层面', ok:hasWithin, okText:'明确指出该效应属于个体内层面。', fixText:'结果句里还需要写出“个体内层面”或 within-person。' },
+    { label:'路径方向与符号', ok:hasDirection, okText:'提到了路径方向或焦虑/抑郁的跨时预测。', fixText:'请补充路径方向，例如“焦虑正向预测后一时间点抑郁”。' },
+    { label:'拟合指标', ok:hasFit, okText:'交代了 CFI / RMSEA 或整体拟合。', fixText:'建议先交代模型拟合，再解释主要路径。' },
+    { label:'避免过强因果', ok:!overCausal, okText:'没有把路径写成过强因果结论。', fixText:'“导致/证明因果”表述过强，建议改成“预测”或“关联”。' }
+  ];
+  const passed = items.filter(item => item.ok).length;
+  const quality = passed >= 4 ? 'good' : (passed >= 2 ? 'basic' : 'needs');
+  return {
+    quality,
+    label: quality === 'good' ? '较好' : (quality === 'basic' ? '基本到位' : '需加强'),
+    score: quality === 'good' ? 25 : (quality === 'basic' ? 16 : 8),
+    done: items.filter(item => item.ok).map(item => item.okText),
+    fixes: items.filter(item => !item.ok).map(item => item.fixText)
+  };
+}
+
+function buildModule4RevisionChecklist(codeChecks, valueChecks, textChecks) {
+  const items = [];
+  codeChecks.filter(item => item.level !== 'ok').slice(0, 3).forEach(item => items.push(item.message));
+  valueChecks.filter(item => item.level === 'missing' || item.level === 'error').slice(0, 2)
+    .forEach(item => items.push(`${item.label}：${item.message}`));
+  textChecks.fixes.slice(0, 2).forEach(item => items.push(item));
+  return items.length ? items.slice(0, 4) : ['核对无明显缺口，可以进入下一题或尝试用自己的数据重跑模型。'];
+}
+
+function codeContainsPattern(code, pattern) {
+  return new RegExp(pattern, 'i').test(code || '');
+}
+
+function hasMeasurement(code, lhs, vars) {
+  return vars.every(v => codeContainsPattern(code, `${lhs}\\s*=~[\\s\\S]{0,180}${v}`));
+}
+
+function hasZeroVariance(code, variable) {
+  return codeContainsPattern(code, `${variable}\\s*~~\\s*0\\s*\\*\\s*${variable}`) ||
+    codeContainsPattern(code, `${variable}\\s*~~\\s*${variable}\\s*\\*\\s*0`);
+}
+
+function hasRegression(code, lhs, rhs) {
+  return codeContainsPattern(code, `${lhs}\\s*~[^\\n;]*${rhs}`);
+}
+
+function hasCovariance(code, left, right) {
+  return codeContainsPattern(code, `${left}\\s*~~[^\\n;]*${right}`) ||
+    codeContainsPattern(code, `${right}\\s*~~[^\\n;]*${left}`);
+}
+
+function hasOffWaveWithinCovariance(code) {
+  for (let i = 1; i <= 3; i++) {
+    for (let j = 1; j <= 3; j++) {
+      if (i !== j && hasCovariance(code, `wx${i}`, `wy${j}`)) return true;
+    }
+  }
+  return false;
+}
+
+function formatMetric(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '——';
+  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 function gradeSlotFill(q, answers) {
   const active = { code:true, values:false, stat:false, text:!!q.textPrompt };
   let stat = 0;
@@ -1153,6 +1334,16 @@ function gradeTextAnswer(q, textValue) {
 function renderFeedbackPage(q, mod, submission, scores) {
   const qData = q || {};
   const fb = qData.feedback || {};
+
+  if (qData.feedbackMode === 'module4_check_report') {
+    renderModule4FeedbackPage(qData, mod, submission, scores);
+    updateFeedbackNextButton(mod);
+    return;
+  }
+
+  renderDefaultFeedbackBody();
+  const scoreHeader = document.querySelector('#page-feedback .feedback-header__score');
+  if (scoreHeader) scoreHeader.style.display = '';
 
   $('fb-title').textContent = `本题反馈：${qData.title || '反馈报告'}`;
   $('fb-meta').textContent  = `${mod.title} · 第 ${wsState.qIndex + 1} / ${mod.questions.length} 题 · ${(mod.questions[wsState.qIndex]||{}).type||''} · ${(mod.questions[wsState.qIndex]||{}).level||''}`;
@@ -1227,6 +1418,10 @@ function renderFeedbackPage(q, mod, submission, scores) {
     <div class="suggestion-item"><span class="suggestion-item__icon">🎯</span>${n}</div>
   `).join('');
 
+  updateFeedbackNextButton(mod);
+}
+
+function updateFeedbackNextButton(mod) {
   const nextBtn = $('fb-next-btn');
   if (wsState.qIndex < mod.questions.length - 1) {
     const nextQuestionMeta = mod.questions[wsState.qIndex + 1];
@@ -1234,6 +1429,163 @@ function renderFeedbackPage(q, mod, submission, scores) {
   } else {
     nextBtn.textContent = '完成模块，返回模块选择';
   }
+}
+
+function renderDefaultFeedbackBody() {
+  const body = document.querySelector('#page-feedback .feedback-body');
+  if (!body) return;
+  body.innerHTML = `
+    <div class="feedback-section">
+      <div class="feedback-section__title">📊 分项得分</div>
+      <div class="score-breakdown">
+        <div class="score-dim">
+          <div class="score-dim__name">代码结构</div>
+          <div class="score-dim__num text-accent" id="fb-score-code">0</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">数值结果</div>
+          <div class="score-dim__num text-green" id="fb-score-values">0</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">统计理解</div>
+          <div class="score-dim__num text-orange" id="fb-score-stat">0</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+        <div class="score-dim">
+          <div class="score-dim__name">表述质量</div>
+          <div class="score-dim__num text-purple" id="fb-score-text">0</div>
+          <div class="score-dim__total">/ 25</div>
+        </div>
+      </div>
+    </div>
+    <div class="feedback-section">
+      <div class="feedback-section__title">✅ 你已经做对了</div>
+      <div class="feedback-list" id="fb-correct-list"></div>
+    </div>
+    <div class="feedback-section">
+      <div class="feedback-section__title">⚠️ 仍有问题的地方</div>
+      <div class="feedback-list" id="fb-issues-list"></div>
+    </div>
+    <div class="feedback-section">
+      <div class="feedback-section__title">💡 为什么这会影响结论</div>
+      <div class="feedback-list" id="fb-why-list"></div>
+    </div>
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">🎯 下一步建议</div>
+      <div class="suggestion-list" id="fb-suggestion-list"></div>
+    </div>
+  `;
+}
+
+function renderModule4FeedbackPage(q, mod, submission, scores) {
+  const report = scores.module4Report || {};
+  const answer = q.answer || {};
+  const body = document.querySelector('#page-feedback .feedback-body');
+  const scoreHeader = document.querySelector('#page-feedback .feedback-header__score');
+  if (scoreHeader) scoreHeader.style.display = 'none';
+
+  $('fb-title').textContent = '本题核对报告';
+  $('fb-meta').textContent  = `${q.title} · 代码结构 / 关键数值 / 结果表述`;
+  const badgesEl = $('fb-badges');
+  badgesEl.innerHTML = `
+    <span class="badge badge--orange">${q.level}</span>
+    <span class="badge badge--purple">Module 4</span>
+    <span class="badge ${report.isComplete ? 'badge--green' : 'badge--red'}">${report.isComplete ? '可进入下一步' : '需要修正'}</span>
+  `;
+
+  if (!body) return;
+  body.innerHTML = `
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">代码结构核对</div>
+      <div class="check-grid">
+        ${(report.codeChecks || []).map(renderModule4CheckRow).join('')}
+      </div>
+    </div>
+
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">关键数值核对</div>
+      <div class="value-check-table">
+        <div class="value-check-table__head">
+          <span>指标</span><span>你的填写</span><span>标准答案 / 目标值</span><span>核对结果</span>
+        </div>
+        ${(report.valueChecks || []).map(renderModule4ValueRow).join('')}
+      </div>
+    </div>
+
+    <div class="feedback-section">
+      <div class="feedback-section__title">一句结果表述核对</div>
+      <div class="expression-quality">
+        <span class="check-pill check-pill--${report.textChecks.quality}">表述质量：${report.textChecks.label}</span>
+      </div>
+      <div class="module4-subtitle">已做到</div>
+      <div class="feedback-list">
+        ${renderModule4TextList(report.textChecks.done, 'ok', '目前还没有检测到明确到位的表述点。')}
+      </div>
+      <div class="module4-subtitle">需要修正</div>
+      <div class="feedback-list">
+        ${renderModule4TextList(report.textChecks.fixes, 'warn', '表述没有明显问题，可以尝试写得更完整。')}
+      </div>
+    </div>
+
+    <div class="feedback-section">
+      <div class="feedback-section__title">重新作答前的修改清单</div>
+      <div class="suggestion-list">
+        ${(report.checklist || []).map(item => `
+          <div class="suggestion-item"><span class="suggestion-item__icon">→</span>${escapeHtml(item)}</div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">标准答案 / 参考作答</div>
+      <div class="reference-answer">
+        <div class="module4-subtitle">参考代码骨架</div>
+        <pre class="reference-code"><code>${escapeHtml(answer.referenceCode || '')}</code></pre>
+        <div class="module4-subtitle">参考数值答案</div>
+        <div class="reference-values">
+          ${(q.values || []).map(v => {
+            const ref = answer.referenceValues && answer.referenceValues[v.key];
+            return `<span>${escapeHtml(v.label)} = ${ref ? formatMetric(ref.value) : '——'}</span>`;
+          }).join('')}
+        </div>
+        <div class="module4-subtitle">参考结果表述</div>
+        <p class="reference-text">${escapeHtml(answer.referenceText || '')}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderModule4CheckRow(item) {
+  return `
+    <div class="check-row check-row--${item.level}">
+      <div class="check-row__status">${escapeHtml(item.status)}</div>
+      <div>
+        <div class="check-row__label">${escapeHtml(item.label)}</div>
+        <div class="check-row__message">${escapeHtml(item.message)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderModule4ValueRow(item) {
+  return `
+    <div class="value-check-table__row value-check-table__row--${item.level}">
+      <span>${escapeHtml(item.label)}</span>
+      <span>${typeof item.user === 'number' ? formatMetric(item.user) : escapeHtml(item.user)}</span>
+      <span>${formatMetric(item.reference)}</span>
+      <span><strong>${escapeHtml(item.status)}</strong><small>${escapeHtml(item.message)}</small></span>
+    </div>
+  `;
+}
+
+function renderModule4TextList(items, type, fallback) {
+  const list = items && items.length ? items : [fallback];
+  const icon = type === 'ok' ? '✓' : '!';
+  return list.map(item => `
+    <div class="feedback-item"><span class="feedback-item__icon">${icon}</span>${escapeHtml(item)}</div>
+  `).join('');
 }
 
 function normalizeChoiceList(list) {
