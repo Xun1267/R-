@@ -270,6 +270,9 @@
         <div class="topicmap-header__sub">
           将心理学研究中的数据整理、统计建模、纵向追踪和结果写作拆成可练习的专题模块；当前可从纵向模型进入 RI-CLPM 训练，逐步完成研究问题、代码、结果解读与论文表述。
         </div>
+        <div class="topicmap-header__actions">
+          <button class="btn btn--ghost btn--sm" onclick="goPage('home')">← 返回首页</button>
+        </div>
       </div>
       <div class="topicmap-header__path">
         <span>研究问题</span>
@@ -333,7 +336,7 @@
 
   <!-- 顶部工具栏 -->
   <div class="workspace-topbar">
-    <button class="workspace-topbar__back" onclick="goPage('module')">← 返回模块</button>
+    <button class="workspace-topbar__back" onclick="returnToCurrentModule()">← 返回模块</button>
     <div class="workspace-topbar__title" id="ws-topbar-title">题目标题</div>
     <div class="flex gap-8">
       <span class="badge badge--blue" id="ws-qtype">判断题</span>
@@ -579,10 +582,16 @@
       <div class="feedback-header__meta text-secondary" id="fb-meta">模块 · 题目类型 · 难度</div>
       <div class="flex gap-8 wrap mt-12" id="fb-badges"></div>
     </div>
-    <div class="feedback-header__score">
-      <div class="total-score-ring">
-        <div class="total-score-ring__num" id="fb-total-score">72</div>
-        <div class="total-score-ring__label" id="fb-score-label">本题 / 100</div>
+    <div class="feedback-header__side">
+      <div class="feedback-header__score">
+        <div class="total-score-ring">
+          <div class="total-score-ring__num" id="fb-total-score">72</div>
+          <div class="total-score-ring__label" id="fb-score-label">本题 / 100</div>
+        </div>
+      </div>
+      <div class="feedback-header__actions">
+        <button class="btn btn--secondary btn--sm" onclick="returnToCurrentQuestion()">← 返回题目</button>
+        <button class="btn btn--ghost btn--sm" onclick="returnToCurrentModule()">返回模块</button>
       </div>
     </div>
   </div>
@@ -696,7 +705,7 @@
   <!-- 操作按钮 -->
   <div class="feedback-actions container">
     <button class="btn btn--secondary" onclick="retryQuestion()">🔄 重新作答</button>
-    <button class="btn btn--ghost"     onclick="goPage('module')">← 返回模块</button>
+    <button class="btn btn--ghost"     onclick="returnToCurrentModule()">← 返回模块</button>
     <button class="btn btn--primary"   onclick="nextQuestion()" id="fb-next-btn">下一题 →</button>
     <button class="btn btn--success"   onclick="exportCurrentRecord()" style="margin-left:auto;">💾 导出本题记录</button>
   </div>
@@ -720,6 +729,7 @@
       </div>
     </div>
     <div class="progress-header__actions">
+      <button class="btn btn--ghost btn--sm" onclick="goPage('home')">← 返回首页</button>
       <button class="btn btn--secondary btn--sm" onclick="handleContinueTraining()">继续训练</button>
     </div>
   </div>

@@ -587,6 +587,7 @@ function renderModuleOverview() {
 function renderModuleDetail(id) {
   const mod = MODULE_DATA[id];
   if (!mod) return;
+  currentModuleId = id;
 
   $('module-back-btn').textContent = '← 返回模块选择';
   $('module-back-btn').onclick = () => {
@@ -656,9 +657,29 @@ function goQuestion(moduleId, qIndex) {
   const mod = MODULE_DATA[moduleId];
   wsState.questionId = mod.questions[qIndex].id;
   wsState.hintsShown = 0;
+  currentModuleId = moduleId;
 
   loadQuestionIntoWorkspace(wsState.questionId);
   goPage('workspace');
+}
+
+function returnToCurrentModule() {
+  if (wsState && wsState.moduleId && MODULE_DATA[wsState.moduleId]) {
+    renderModuleDetail(wsState.moduleId);
+  } else if (currentModuleId && MODULE_DATA[currentModuleId]) {
+    renderModuleDetail(currentModuleId);
+  } else {
+    renderModuleOverview();
+  }
+  goPage('module');
+}
+
+function returnToCurrentQuestion() {
+  if (wsState && wsState.questionId && QUESTION_DATA[wsState.questionId]) {
+    goPage('workspace');
+    return;
+  }
+  returnToCurrentModule();
 }
 
 function loadQuestionIntoWorkspace(qid) {
@@ -1598,8 +1619,12 @@ function formatChoiceList(list) {
 }
 
 function retryQuestion() {
-  goPage('workspace');
-  loadQuestionIntoWorkspace(wsState.questionId);
+  if (wsState && wsState.questionId && QUESTION_DATA[wsState.questionId]) {
+    loadQuestionIntoWorkspace(wsState.questionId);
+    goPage('workspace');
+    return;
+  }
+  returnToCurrentModule();
 }
 
 function nextQuestion() {

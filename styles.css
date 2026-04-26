@@ -1034,6 +1034,7 @@
     .topicmap-header__eyebrow { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
     .topicmap-header__title { font-size: 34px; line-height: 1.28; font-weight: 820; margin-bottom: 10px; letter-spacing: 0; }
     .topicmap-header__sub { font-size: 15px; color: var(--text-secondary); max-width: 720px; line-height: 1.85; }
+    .topicmap-header__actions { margin-top: 18px; display: flex; gap: 8px; flex-wrap: wrap; }
     .topicmap-header__path {
       display: flex;
       flex-wrap: wrap;
@@ -1684,8 +1685,21 @@
     .feedback-header__info { flex: 1; }
     .feedback-header__title { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
     .feedback-header__meta  { font-size: 13px; color: var(--text-secondary); }
+    .feedback-header__side {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
     .feedback-header__score {
       display: flex; align-items: center; gap: 16px;
+    }
+    .feedback-header__actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .total-score-ring {
       width: 96px; height: 96px; border-radius: 50%;
@@ -1826,7 +1840,7 @@
     .progress-header__info { flex: 1; }
     .progress-header__name { font-size: 22px; font-weight: 800; }
     .progress-header__meta { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
-    .progress-header__actions { display: flex; gap: 8px; }
+    .progress-header__actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
     .progress-body { padding: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     @media (max-width: 900px) { .progress-body { grid-template-columns: 1fr; } }
@@ -1951,6 +1965,11 @@
         gap: 20px;
       }
       .topicmap-header__path {
+        justify-content: flex-start;
+      }
+      .feedback-header__side,
+      .feedback-header__actions,
+      .progress-header__actions {
         justify-content: flex-start;
       }
       .architecture-group__header,
