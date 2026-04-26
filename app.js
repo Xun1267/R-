@@ -912,16 +912,29 @@ function saveDraft() {
 function downloadData() {
   const q = QUESTION_DATA[wsState.questionId];
   const dataName = q && q.dataName ? q.dataName : 'sim_data.csv';
+  const isThreeVariableMediation = q && q.dataName === 'stress_rumination_depression_3wave.csv';
 
-  let csv = 'id,x1,x2,x3,y1,y2,y3\n';
+  let csv = isThreeVariableMediation
+    ? 'id,x1,x2,x3,m1,m2,m3,y1,y2,y3\n'
+    : 'id,x1,x2,x3,y1,y2,y3\n';
   for (let i = 1; i <= 300; i++) {
     const x1 = +(Math.random()*2 - 1 + Math.random()).toFixed(3);
     const x2 = +(x1 * 0.4 + Math.random()*0.8 - 0.4).toFixed(3);
     const x3 = +(x2 * 0.4 + Math.random()*0.8 - 0.4).toFixed(3);
-    const y1 = +(Math.random()*2 - 1 + Math.random()).toFixed(3);
-    const y2 = +(y1 * 0.38 + x1 * 0.23 + Math.random()*0.8 - 0.4).toFixed(3);
-    const y3 = +(y2 * 0.38 + x2 * 0.23 + Math.random()*0.8 - 0.4).toFixed(3);
-    csv += `${i},${x1},${x2},${x3},${y1},${y2},${y3}\n`;
+    if (isThreeVariableMediation) {
+      const m1 = +(0.22*x1 + Math.random()*1.2 - 0.6).toFixed(3);
+      const m2 = +(0.42*m1 + 0.33*x1 + Math.random()*0.8 - 0.4).toFixed(3);
+      const m3 = +(0.42*m2 + 0.18*x2 + Math.random()*0.8 - 0.4).toFixed(3);
+      const y1 = +(0.18*m1 + Math.random()*1.2 - 0.6).toFixed(3);
+      const y2 = +(0.38*y1 + 0.18*m1 + 0.10*x1 + Math.random()*0.8 - 0.4).toFixed(3);
+      const y3 = +(0.38*y2 + 0.26*m2 + 0.09*x1 + Math.random()*0.8 - 0.4).toFixed(3);
+      csv += `${i},${x1},${x2},${x3},${m1},${m2},${m3},${y1},${y2},${y3}\n`;
+    } else {
+      const y1 = +(Math.random()*2 - 1 + Math.random()).toFixed(3);
+      const y2 = +(y1 * 0.38 + x1 * 0.23 + Math.random()*0.8 - 0.4).toFixed(3);
+      const y3 = +(y2 * 0.38 + x2 * 0.23 + Math.random()*0.8 - 0.4).toFixed(3);
+      csv += `${i},${x1},${x2},${x3},${y1},${y2},${y3}\n`;
+    }
   }
   const blob = new Blob([csv], { type:'text/csv' });
   const url  = URL.createObjectURL(blob);
@@ -932,11 +945,12 @@ function downloadData() {
 }
 
 function downloadStarter() {
-  const code = `# RI-CLPM Starter Code\nlibrary(lavaan)\n\n# 读取数据\ndata <- read.csv("sim_data.csv")\n\n# 在此搭建你的 RI-CLPM 模型\nmodel <- '\n  # 随机截距\n  RI_x =~ 1*x1 + 1*x2 + 1*x3\n  RI_y =~ 1*y1 + 1*y2 + 1*y3\n\n  # 个体内残差 (within-person components)\n  wx1 =~ 1*x1\n  wx2 =~ 1*x2\n  wx3 =~ 1*x3\n  wy1 =~ 1*y1\n  wy2 =~ 1*y2\n  wy3 =~ 1*y3\n\n  # 固定测量误差为0\n  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3\n  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3\n\n  # 自回归路径 (等同约束)\n  wx2 ~ a*wx1; wx3 ~ a*wx2\n  wy2 ~ b*wy1; wy3 ~ b*wy2\n\n  # 交叉滞后路径 (等同约束)\n  wx2 ~ c*wy1; wx3 ~ c*wy2\n  wy2 ~ d*wx1; wy3 ~ d*wx2\n'\n\n# 运行模型\nfit <- lavaan(model, data = data, estimator = "ML",\n              missing = "listwise", std.lv = FALSE)\n\n# 查看结果\nsummary(fit, fit.measures = TRUE, standardized = TRUE)\nfitmeasures(fit, c("cfi","tli","rmsea","srmr"))\n`;
+  const q = QUESTION_DATA[wsState.questionId];
+  const code = q && q.starterCode ? q.starterCode : `# RI-CLPM Starter Code\nlibrary(lavaan)\n\n# 读取数据\ndata <- read.csv("sim_data.csv")\n\n# 在此搭建你的 RI-CLPM 模型\nmodel <- '\n  # 随机截距\n  RI_x =~ 1*x1 + 1*x2 + 1*x3\n  RI_y =~ 1*y1 + 1*y2 + 1*y3\n\n  # 个体内残差 (within-person components)\n  wx1 =~ 1*x1\n  wx2 =~ 1*x2\n  wx3 =~ 1*x3\n  wy1 =~ 1*y1\n  wy2 =~ 1*y2\n  wy3 =~ 1*y3\n\n  # 固定测量误差为0\n  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3\n  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3\n\n  # 自回归路径 (等同约束)\n  wx2 ~ a*wx1; wx3 ~ a*wx2\n  wy2 ~ b*wy1; wy3 ~ b*wy2\n\n  # 交叉滞后路径 (等同约束)\n  wx2 ~ c*wy1; wx3 ~ c*wy2\n  wy2 ~ d*wx1; wy3 ~ d*wx2\n'\n\n# 运行模型\nfit <- lavaan(model, data = data, estimator = "ML",\n              missing = "listwise", std.lv = FALSE)\n\n# 查看结果\nsummary(fit, fit.measures = TRUE, standardized = TRUE)\nfitmeasures(fit, c("cfi","tli","rmsea","srmr"))\n`;
   const blob = new Blob([code], { type:'text/plain' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = 'starter_code.R'; a.click();
+  a.href = url; a.download = (q && q.starterName) || 'starter_code.R'; a.click();
   URL.revokeObjectURL(url);
   showToast('Starter Code 已下载', 'success');
 }
@@ -1040,6 +1054,9 @@ function isSubmissionComplete(q, scores) {
   if (q && q.feedbackMode === 'module4_check_report') {
     return !!(scores.module4Report && scores.module4Report.isComplete);
   }
+  if (q && (q.feedbackMode === 'module5_structure_check' || q.feedbackMode === 'module5_bootstrap_check')) {
+    return !!(scores.module5Report && scores.module5Report.isComplete);
+  }
   return scores.total >= 60;
 }
 
@@ -1047,6 +1064,9 @@ function autoScore(q, answers) {
   if (!q) return { total:0, code:0, values:0, stat:0, text:0 };
   if (q.feedbackMode === 'module4_check_report') {
     return gradeModule4CheckReport(q, answers);
+  }
+  if (q.feedbackMode === 'module5_structure_check' || q.feedbackMode === 'module5_bootstrap_check') {
+    return gradeModule5CheckReport(q, answers);
   }
   if (q.answer && q.answer.graderType === 'slot_fill') {
     return gradeSlotFill(q, answers);
@@ -1238,7 +1258,7 @@ function buildModule4TextChecks(q, textValue) {
   const hasWithin = /个体内|within|within-person/i.test(text);
   const hasDirection = /焦虑|抑郁|x|y|wx|wy|预测|正向|负向|路径|β|beta/i.test(text);
   const hasFit = /拟合|CFI|RMSEA|SRMR|TLI/i.test(text);
-  const overCausal = /导致|证明|因果|决定/.test(text);
+  const overCausal = /导致|证明因果|证明.*因果|决定/.test(text);
   const items = [
     { label:'个体内层面', ok:hasWithin, okText:'明确指出该效应属于个体内层面。', fixText:'结果句里还需要写出“个体内层面”或 within-person。' },
     { label:'路径方向与符号', ok:hasDirection, okText:'提到了路径方向或焦虑/抑郁的跨时预测。', fixText:'请补充路径方向，例如“焦虑正向预测后一时间点抑郁”。' },
@@ -1265,8 +1285,145 @@ function buildModule4RevisionChecklist(codeChecks, valueChecks, textChecks) {
   return items.length ? items.slice(0, 4) : ['核对无明显缺口，可以进入下一题或尝试用自己的数据重跑模型。'];
 }
 
+function gradeModule5CheckReport(q, answers) {
+  const codeChecks = buildModule5CodeChecks(q, answers.code || '');
+  const valueChecks = buildModule4ValueChecks(q, answers.values || {});
+  const textChecks = buildModule5TextChecks(q, answers.text || '');
+  const judgeChecks = buildModule5JudgeChecks(q, answers.judge);
+
+  const codeOk = codeChecks.every(item => item.level !== 'missing' && item.level !== 'error');
+  const valuesOk = valueChecks.every(item => item.level === 'ok' || item.level === 'near');
+  const textOk = textChecks.quality !== 'needs';
+  const judgeOk = judgeChecks.every(item => item.level === 'ok');
+
+  const code = codeChecks.length
+    ? Math.round(codeChecks.filter(item => item.level === 'ok').length / codeChecks.length * 25)
+    : 0;
+  const values = valueChecks.length
+    ? Math.round(valueChecks.filter(item => item.level === 'ok' || item.level === 'near').length / valueChecks.length * 25)
+    : 0;
+  const stat = judgeChecks.length && judgeOk ? 25 : 0;
+  const text = textChecks.score;
+  const total = Math.round((code / 25) * 45 + (values / 25) * 30 + (stat / 25) * 10 + (text / 25) * 15);
+
+  return {
+    total,
+    code,
+    values,
+    stat,
+    text,
+    active: { code:true, values:true, stat:!!judgeChecks.length, text:true },
+    module5Report: {
+      codeChecks,
+      valueChecks,
+      judgeChecks,
+      textChecks,
+      isComplete: codeOk && valuesOk && judgeOk && textOk,
+      checklist: buildModule5RevisionChecklist(codeChecks, valueChecks, judgeChecks, textChecks)
+    }
+  };
+}
+
+function buildModule5CodeChecks(q, code) {
+  const checkedCode = stripRComments(code);
+  if (q.feedbackMode === 'module5_bootstrap_check') {
+    return [
+      makeCodeCheck('保留间接效应定义 ind_xmy := a*b', hasDefinedProduct(checkedCode, 'ind_xmy', 'a', 'b'),
+        '已检测到 ind_xmy 定义参数。', '请确认模型中保留 `ind_xmy := a*b`。'),
+      makeCodeCheck('使用 bootstrap 标准误', codeContainsPattern(checkedCode, 'se\\s*=\\s*["\']bootstrap["\']'),
+        '已检测到 `se = "bootstrap"`。', '请在 lavaan() 中加入 `se = "bootstrap"`。'),
+      makeCodeCheck('设置 bootstrap 次数', codeContainsPattern(checkedCode, 'bootstrap\\s*=\\s*(5000|[1-9][0-9]{3,})'),
+        '已检测到 bootstrap 次数设置。', '请加入 `bootstrap = 5000` 或至少 1000 次以上的 bootstrap 设置。'),
+      makeCodeCheck('提取 bootstrap 置信区间', codeContainsPattern(checkedCode, 'parameterEstimates') && codeContainsPattern(checkedCode, 'boot\\.ci\\.type'),
+        '已检测到 parameterEstimates() 与 boot.ci.type。', '请使用 `parameterEstimates(..., ci = TRUE, boot.ci.type = "perc")` 或等价代码提取区间。'),
+      makeCodeCheck('定位 ind_xmy 结果行', codeContainsPattern(checkedCode, 'ind_xmy'),
+        '提取代码中包含 ind_xmy。', '提取参数表时请明确定位 ind_xmy 的估计值与 CI。')
+    ];
+  }
+
+  return [
+    makeCodeCheck('三组随机截距 RI_x / RI_m / RI_y',
+      hasMeasurement(checkedCode, 'RI_x', ['x1','x2','x3']) &&
+      hasMeasurement(checkedCode, 'RI_m', ['m1','m2','m3']) &&
+      hasMeasurement(checkedCode, 'RI_y', ['y1','y2','y3']),
+      '三组随机截距定义完整。', '请补齐 `RI_x`、`RI_m`、`RI_y` 对三个波次的定义。'),
+    makeCodeCheck('三组 within 成分 wx / wm / wy',
+      ['wx1','wx2','wx3'].every((lhs, i) => hasMeasurement(checkedCode, lhs, [`x${i+1}`])) &&
+      ['wm1','wm2','wm3'].every((lhs, i) => hasMeasurement(checkedCode, lhs, [`m${i+1}`])) &&
+      ['wy1','wy2','wy3'].every((lhs, i) => hasMeasurement(checkedCode, lhs, [`y${i+1}`])),
+      'wx、wm、wy 三组 within 成分已覆盖 1-3 波。', '请确认 wx1-wx3、wm1-wm3、wy1-wy3 都已定义。'),
+    makeCodeCheck('固定九个观测变量残差方差为 0',
+      ['x1','x2','x3','m1','m2','m3','y1','y2','y3'].every(v => hasZeroVariance(checkedCode, v)),
+      '九个观测变量的残差方差已固定。', '请补齐 x、m、y 三组变量的 `变量 ~~ 0*变量` 语句。'),
+    makeCodeCheck('三变量自回归路径',
+      [
+        ['wx2','wx1'], ['wx3','wx2'],
+        ['wm2','wm1'], ['wm3','wm2'],
+        ['wy2','wy1'], ['wy3','wy2']
+      ].every(([lhs, rhs]) => hasRegression(checkedCode, lhs, rhs)),
+      'x、m、y 三个变量的相邻波次自回归路径已覆盖。', '请补齐 wx、wm、wy 三组相邻时间点自回归路径。'),
+    makeCodeCheck('a 路径：wm2 ~ a*wx1', hasLabeledRegression(checkedCode, 'wm2', 'a', 'wx1'),
+      '已检测到 `wm2 ~ a*wx1`。', '请把 a 路径明确写成 `wm2 ~ a*wx1`。'),
+    makeCodeCheck('b 路径：wy3 ~ b*wm2', hasLabeledRegression(checkedCode, 'wy3', 'b', 'wm2'),
+      '已检测到 `wy3 ~ b*wm2`。', '请把 b 路径明确写成 `wy3 ~ b*wm2`。'),
+    makeCodeCheck('c 直接路径：wy3 ~ c*wx1', hasLabeledRegression(checkedCode, 'wy3', 'c', 'wx1'),
+      '已检测到 `wy3 ~ c*wx1`。', '请加入直接路径 `wy3 ~ c*wx1`，用于和间接链区分。'),
+    makeCodeCheck('间接效应：ind_xmy := a*b', hasDefinedProduct(checkedCode, 'ind_xmy', 'a', 'b'),
+      '已检测到 `ind_xmy := a*b`。', '请用定义参数写出 `ind_xmy := a*b`，不要写成回归路径。')
+  ];
+}
+
+function buildModule5JudgeChecks(q, judgeValue) {
+  if (!q.judgeQ || !q.answer || !q.answer.judge) return [];
+  const ok = judgeValue === q.answer.judge;
+  return [
+    makeCodeCheck('CI 显著性判断', ok,
+      '判断正确：bootstrap CI 不包含 0。', '本题参考 CI 为 [0.041, 0.132]，不包含 0，因此应判断为显著。', 'error')
+  ];
+}
+
+function buildModule5TextChecks(q, textValue) {
+  const text = (textValue || '').trim();
+  const isBootstrap = q.feedbackMode === 'module5_bootstrap_check';
+  const hasWithin = /个体内|within|within-person/i.test(text);
+  const hasIndirect = /间接效应|中介|indirect|ind_xmy|a\s*\*\s*b/i.test(text);
+  const hasChain = /X1|x1|wx1|M2|m2|wm2|Y3|y3|wy3|跨时|链/i.test(text);
+  const hasCi = /CI|置信区间|不包含\s*0|不跨\s*0|包含\s*0|跨\s*0/i.test(text);
+  const overCausal = /导致|证明因果|证明.*因果|决定/.test(text);
+  const items = [
+    { label:'within-person 限定', ok:hasWithin, okText:'明确把结论限定在 within-person 层面。', fixText:'结论里需要出现“个体内”或 within-person。' },
+    { label:'间接效应', ok:hasIndirect, okText:'提到了中介或间接效应。', fixText:'请明确说明这里检验的是间接效应 / 中介链。' },
+    { label:'跨时链条', ok:isBootstrap ? true : hasChain, okText:'说明了 X1 -> M2 -> Y3 的跨时间链条。', fixText:'建议写清楚 X1 -> M2 -> Y3 的时间顺序。' },
+    { label:'CI 解读', ok:isBootstrap ? hasCi : true, okText:'正确使用 CI 是否包含 0 来解释显著性。', fixText:'bootstrap 题需要说明 CI 是否包含 0。' },
+    { label:'避免过强因果', ok:!overCausal, okText:'没有把结果写成过强因果证明。', fixText:'“导致/证明因果”过强，建议改成“预测”“统计支持”或“机制线索”。' }
+  ];
+  const passed = items.filter(item => item.ok).length;
+  const quality = passed >= 5 ? 'good' : (passed >= 3 ? 'basic' : 'needs');
+  return {
+    quality,
+    label: quality === 'good' ? '较好' : (quality === 'basic' ? '基本到位' : '需加强'),
+    score: quality === 'good' ? 25 : (quality === 'basic' ? 16 : 8),
+    done: items.filter(item => item.ok).map(item => item.okText),
+    fixes: items.filter(item => !item.ok).map(item => item.fixText)
+  };
+}
+
+function buildModule5RevisionChecklist(codeChecks, valueChecks, judgeChecks, textChecks) {
+  const items = [];
+  codeChecks.filter(item => item.level !== 'ok').slice(0, 3).forEach(item => items.push(item.message));
+  valueChecks.filter(item => item.level === 'missing' || item.level === 'error').slice(0, 2)
+    .forEach(item => items.push(`${item.label}：${item.message}`));
+  judgeChecks.filter(item => item.level !== 'ok').forEach(item => items.push(item.message));
+  textChecks.fixes.slice(0, 2).forEach(item => items.push(item));
+  return items.length ? items.slice(0, 5) : ['本题核对无明显缺口，可以进入下一题或尝试用自己的研究变量替换 x/m/y。'];
+}
+
 function codeContainsPattern(code, pattern) {
   return new RegExp(pattern, 'i').test(code || '');
+}
+
+function stripRComments(code) {
+  return String(code || '').split('\n').map(line => line.replace(/#.*/, '')).join('\n');
 }
 
 function hasMeasurement(code, lhs, vars) {
@@ -1280,6 +1437,15 @@ function hasZeroVariance(code, variable) {
 
 function hasRegression(code, lhs, rhs) {
   return codeContainsPattern(code, `${lhs}\\s*~[^\\n;]*${rhs}`);
+}
+
+function hasLabeledRegression(code, lhs, label, rhs) {
+  return codeContainsPattern(code, `${lhs}\\s*~[^\\n;]*${label}\\s*\\*\\s*${rhs}`);
+}
+
+function hasDefinedProduct(code, lhs, left, right) {
+  return codeContainsPattern(code, `${lhs}\\s*:=\\s*${left}\\s*\\*\\s*${right}`) ||
+    codeContainsPattern(code, `${lhs}\\s*:=\\s*${right}\\s*\\*\\s*${left}`);
 }
 
 function hasCovariance(code, left, right) {
@@ -1358,6 +1524,11 @@ function renderFeedbackPage(q, mod, submission, scores) {
 
   if (qData.feedbackMode === 'module4_check_report') {
     renderModule4FeedbackPage(qData, mod, submission, scores);
+    updateFeedbackNextButton(mod);
+    return;
+  }
+  if (qData.feedbackMode === 'module5_structure_check' || qData.feedbackMode === 'module5_bootstrap_check') {
+    renderModule5FeedbackPage(qData, mod, submission, scores);
     updateFeedbackNextButton(mod);
     return;
   }
@@ -1572,6 +1743,94 @@ function renderModule4FeedbackPage(q, mod, submission, scores) {
           }).join('')}
         </div>
         <div class="module4-subtitle">参考结果表述</div>
+        <p class="reference-text">${escapeHtml(answer.referenceText || '')}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderModule5FeedbackPage(q, mod, submission, scores) {
+  const report = scores.module5Report || {};
+  const answer = q.answer || {};
+  const body = document.querySelector('#page-feedback .feedback-body');
+  const scoreHeader = document.querySelector('#page-feedback .feedback-header__score');
+  if (scoreHeader) scoreHeader.style.display = 'none';
+
+  const isBootstrap = q.feedbackMode === 'module5_bootstrap_check';
+  $('fb-title').textContent = isBootstrap ? 'bootstrap 结果核对' : '中介链组件核对';
+  $('fb-meta').textContent = `${q.title} · ${isBootstrap ? '间接效应 / Bootstrap CI / 结果表述' : '三变量结构 / 中介路径 / 间接效应定义'}`;
+  const badgesEl = $('fb-badges');
+  badgesEl.innerHTML = `
+    <span class="badge badge--red">${q.level}</span>
+    <span class="badge badge--purple">Module 5</span>
+    <span class="badge ${report.isComplete ? 'badge--green' : 'badge--red'}">${report.isComplete ? '可进入下一步' : '需要修正'}</span>
+  `;
+
+  if (!body) return;
+  body.innerHTML = `
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">${isBootstrap ? 'bootstrap 代码核对' : '中介链组件核对'}</div>
+      <div class="check-grid">
+        ${(report.codeChecks || []).map(renderModule4CheckRow).join('')}
+      </div>
+    </div>
+
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">${isBootstrap ? '间接效应与 CI 核对' : '关键路径与间接效应核对'}</div>
+      <div class="value-check-table">
+        <div class="value-check-table__head">
+          <span>项目</span><span>你的填写</span><span>参考值</span><span>核对结果</span>
+        </div>
+        ${(report.valueChecks || []).map(renderModule4ValueRow).join('')}
+      </div>
+    </div>
+
+    ${isBootstrap ? `
+      <div class="feedback-section feedback-section--full">
+        <div class="feedback-section__title">显著性判断核对</div>
+        <div class="check-grid">
+          ${(report.judgeChecks || []).map(renderModule4CheckRow).join('')}
+        </div>
+      </div>
+    ` : ''}
+
+    <div class="feedback-section">
+      <div class="feedback-section__title">表述核对</div>
+      <div class="expression-quality">
+        <span class="check-pill check-pill--${report.textChecks.quality}">表述质量：${report.textChecks.label}</span>
+      </div>
+      <div class="module4-subtitle">已做到</div>
+      <div class="feedback-list">
+        ${renderModule4TextList(report.textChecks.done, 'ok', '目前还没有检测到明确到位的表述点。')}
+      </div>
+      <div class="module4-subtitle">需要修正</div>
+      <div class="feedback-list">
+        ${renderModule4TextList(report.textChecks.fixes, 'warn', '表述没有明显问题，可以尝试写得更完整。')}
+      </div>
+    </div>
+
+    <div class="feedback-section">
+      <div class="feedback-section__title">重新作答前的修改清单</div>
+      <div class="suggestion-list">
+        ${(report.checklist || []).map(item => `
+          <div class="suggestion-item"><span class="suggestion-item__icon">→</span>${escapeHtml(item)}</div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="feedback-section feedback-section--full">
+      <div class="feedback-section__title">标准答案 / 参考作答</div>
+      <div class="reference-answer">
+        <div class="module4-subtitle">${isBootstrap ? '参考 bootstrap 代码' : '参考三变量代码骨架'}</div>
+        <pre class="reference-code"><code>${escapeHtml(answer.referenceCode || '')}</code></pre>
+        <div class="module4-subtitle">参考结果</div>
+        <div class="reference-values">
+          ${(q.values || []).map(v => {
+            const ref = answer.referenceValues && answer.referenceValues[v.key];
+            return `<span>${escapeHtml(v.label)} = ${ref ? formatMetric(ref.value) : '——'}</span>`;
+          }).join('')}
+        </div>
+        <div class="module4-subtitle">参考表述</div>
         <p class="reference-text">${escapeHtml(answer.referenceText || '')}</p>
       </div>
     </div>

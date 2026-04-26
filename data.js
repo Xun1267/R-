@@ -832,6 +832,276 @@ fit <- lavaan(model, data = data, estimator = "ML", missing = "listwise", std.lv
     simOutput: null,
     dataName: 'anxiety_depression_3wave.csv'
   },
+  m5_q1: {
+    title: '三变量 RI-CLPM 中的 within 层面中介',
+    type: 'code',
+    level: '进阶',
+    typeLabel: '模型搭建题',
+    feedbackMode: 'module5_structure_check',
+    scenario: `研究者追踪同一批学生三个学期的学业压力（x）、反刍思维（m）和抑郁症状（y）。现在希望把 Module 4 的双变量 RI-CLPM 骨架推进到三变量机制检验：检验 T1 压力相对自身稳定水平的升高，是否会通过 T2 反刍思维相对自身稳定水平的升高，进一步预测 T3 抑郁症状相对自身稳定水平的变化。请重点搭建一条最清楚的 within-person 中介链 X1 -> M2 -> Y3。`,
+    tasks: [
+      '定义三组随机截距：RI_x、RI_m、RI_y',
+      '定义三组 within 成分：wx1-wx3、wm1-wm3、wy1-wy3',
+      '写出 x、m、y 三个变量的相邻波次自回归路径',
+      '写出中介链：wm2 ~ a*wx1、wy3 ~ b*wm2，并加入 wy3 ~ c*wx1 作为直接路径',
+      '用 ind_xmy := a*b 定义 within-person 间接效应，并填写 a、b 与间接效应参考值'
+    ],
+    answer: {
+      code_keywords: ['RI_x =~', 'RI_m =~', 'RI_y =~', 'wx1', 'wm1', 'wy1', 'ind_xmy :='],
+      values: { a_path: [0.31, 0.35], b_path: [0.24, 0.28], indirect: [0.078, 0.095] },
+      referenceValues: {
+        a_path: { value: 0.330, tolerance: 0.020, closeTolerance: 0.050 },
+        b_path: { value: 0.260, tolerance: 0.020, closeTolerance: 0.050 },
+        indirect: { value: 0.086, tolerance: 0.010, closeTolerance: 0.030 }
+      },
+      referenceCode:
+`library(lavaan)
+data <- read.csv("stress_rumination_depression_3wave.csv")
+
+model <- '
+  # 随机截距：between-person 稳定差异
+  RI_x =~ 1*x1 + 1*x2 + 1*x3
+  RI_m =~ 1*m1 + 1*m2 + 1*m3
+  RI_y =~ 1*y1 + 1*y2 + 1*y3
+
+  # within-person 成分
+  wx1 =~ 1*x1; wx2 =~ 1*x2; wx3 =~ 1*x3
+  wm1 =~ 1*m1; wm2 =~ 1*m2; wm3 =~ 1*m3
+  wy1 =~ 1*y1; wy2 =~ 1*y2; wy3 =~ 1*y3
+
+  # 固定观测变量残差方差
+  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3
+  m1 ~~ 0*m1; m2 ~~ 0*m2; m3 ~~ 0*m3
+  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3
+
+  # 自回归路径
+  wx2 ~ ax*wx1; wx3 ~ ax*wx2
+  wm2 ~ am*wm1; wm3 ~ am*wm2
+  wy2 ~ ay*wy1; wy3 ~ ay*wy2
+
+  # 教学型 within-person 中介链：X1 -> M2 -> Y3
+  wm2 ~ a*wx1
+  wy3 ~ b*wm2 + c*wx1
+
+  # 同波 within 协方差与随机截距协方差
+  wx1 ~~ wm1 + wy1
+  wm1 ~~ wy1
+  wx2 ~~ wm2 + wy2
+  wm2 ~~ wy2
+  wx3 ~~ wm3 + wy3
+  wm3 ~~ wy3
+  RI_x ~~ RI_m + RI_y
+  RI_m ~~ RI_y
+
+  # within-person 间接效应
+  ind_xmy := a*b
+'
+
+fit <- lavaan(model, data = data, estimator = "ML",
+              missing = "listwise", std.lv = FALSE)
+summary(fit, fit.measures = TRUE, standardized = TRUE)`,
+      referenceText: '在 within-person 层面，X1 压力高于个体自身稳定水平时，会正向预测 M2 反刍思维偏离自身稳定水平（a = 0.33），而 M2 反刍进一步正向预测 Y3 抑郁偏离（b = 0.26），X1 -> M2 -> Y3 的间接效应约为 0.086。'
+    },
+    hints: [
+      '三变量 RI-CLPM 需要三组随机截距：RI_x、RI_m、RI_y。',
+      'within 成分也要成组出现：wx、wm、wy 都要覆盖 1-3 波。',
+      '本题只聚焦最干净的一条链：wm2 ~ a*wx1；wy3 ~ b*wm2 + c*wx1。',
+      '间接效应用 lavaan 定义参数写法：ind_xmy := a*b。'
+    ],
+    values: [
+      { key:'a_path', label:'a 路径：wx1 -> wm2' },
+      { key:'b_path', label:'b 路径：wm2 -> wy3' },
+      { key:'indirect', label:'ind_xmy 间接效应' }
+    ],
+    textPrompt: '用1-2句话说明这条 X1 -> M2 -> Y3 中介链为什么必须解释为 within-person 间接效应。',
+    starterCode:
+`# 三变量 RI-CLPM 纵向中介 starter code
+library(lavaan)
+
+data <- read.csv("stress_rumination_depression_3wave.csv")
+
+model <- '
+  # 1. 随机截距：请补齐 RI_x、RI_m、RI_y
+
+  # 2. within-person 成分：请补齐 wx、wm、wy
+
+  # 3. 固定观测变量残差方差为 0
+
+  # 4. 自回归路径
+
+  # 5. 教学型中介链：X1 -> M2 -> Y3
+  # wm2 ~ a*wx1
+  # wy3 ~ b*wm2 + c*wx1
+
+  # 6. 定义 within-person 间接效应
+  # ind_xmy := a*b
+'
+
+fit <- lavaan(model, data = data, estimator = "ML",
+              missing = "listwise", std.lv = FALSE)
+
+summary(fit, fit.measures = TRUE, standardized = TRUE)`,
+    simOutput:
+`参考运行结果（教学模拟）：
+  a path: wx1 -> wm2      Estimate = 0.330
+  b path: wm2 -> wy3      Estimate = 0.260
+  direct: wx1 -> wy3      Estimate = 0.090
+  ind_xmy := a*b          Estimate = 0.086`,
+    dataName: 'stress_rumination_depression_3wave.csv',
+    starterName: 'module5_mediation_starter.R'
+  },
+  m5_q2: {
+    title: 'bootstrap 间接效应检验代码',
+    type: 'code',
+    level: '进阶',
+    typeLabel: '结果检验题',
+    feedbackMode: 'module5_bootstrap_check',
+    scenario: `沿用上一题的三变量 RI-CLPM 中介模型。现在不再重新搭完整骨架，而是训练如何用 bootstrap 检验 ind_xmy := a*b，并从 lavaan 输出中读取间接效应点估计、bootstrap 置信区间和直接效应。请补上 bootstrap 拟合与参数提取代码，并根据模拟输出填写关键结果。`,
+    tasks: [
+      '在 lavaan() 中加入 se = "bootstrap", bootstrap = 5000',
+      '保留 ind_xmy := a*b 的定义参数',
+      '使用 parameterEstimates(..., boot.ci.type = "perc") 或等价方式输出 bootstrap CI',
+      '填写间接效应估计、bootstrap CI 下限、CI 上限和直接效应',
+      '判断 bootstrap CI 是否跨 0，并用1-2句话解释 within-person 间接效应'
+    ],
+    judgeQ: '该 bootstrap 置信区间不包含 0，因此可以说 within-person 间接效应在本次模拟结果中显著。',
+    answer: {
+      judge: 'true',
+      code_keywords: ['se = "bootstrap"', 'bootstrap = 5000', 'parameterEstimates', 'boot.ci.type', 'ind_xmy := a*b'],
+      values: { indirect: [0.078, 0.095], ci_low: [0.030, 0.050], ci_high: [0.120, 0.145], direct: [0.070, 0.110] },
+      referenceValues: {
+        indirect: { value: 0.086, tolerance: 0.010, closeTolerance: 0.030 },
+        ci_low: { value: 0.041, tolerance: 0.012, closeTolerance: 0.030 },
+        ci_high: { value: 0.132, tolerance: 0.015, closeTolerance: 0.035 },
+        direct: { value: 0.090, tolerance: 0.020, closeTolerance: 0.050 }
+      },
+      referenceCode:
+`library(lavaan)
+data <- read.csv("stress_rumination_depression_3wave.csv")
+
+# 已给出完整三变量 RI-CLPM 中介骨架
+model <- '
+  RI_x =~ 1*x1 + 1*x2 + 1*x3
+  RI_m =~ 1*m1 + 1*m2 + 1*m3
+  RI_y =~ 1*y1 + 1*y2 + 1*y3
+
+  wx1 =~ 1*x1; wx2 =~ 1*x2; wx3 =~ 1*x3
+  wm1 =~ 1*m1; wm2 =~ 1*m2; wm3 =~ 1*m3
+  wy1 =~ 1*y1; wy2 =~ 1*y2; wy3 =~ 1*y3
+
+  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3
+  m1 ~~ 0*m1; m2 ~~ 0*m2; m3 ~~ 0*m3
+  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3
+
+  wx2 ~ ax*wx1; wx3 ~ ax*wx2
+  wm2 ~ am*wm1; wm3 ~ am*wm2
+  wy2 ~ ay*wy1; wy3 ~ ay*wy2
+
+  wm2 ~ a*wx1
+  wy3 ~ b*wm2 + c*wx1
+
+  wx1 ~~ wm1 + wy1
+  wm1 ~~ wy1
+  wx2 ~~ wm2 + wy2
+  wm2 ~~ wy2
+  wx3 ~~ wm3 + wy3
+  wm3 ~~ wy3
+  RI_x ~~ RI_m + RI_y
+  RI_m ~~ RI_y
+
+  ind_xmy := a*b
+'
+
+fit_boot <- lavaan(model, data = data, estimator = "ML",
+                   missing = "listwise", std.lv = FALSE,
+                   se = "bootstrap", bootstrap = 5000)
+
+pe <- parameterEstimates(fit_boot, standardized = TRUE,
+                         ci = TRUE, boot.ci.type = "perc")
+
+pe[pe$label %in% c("a", "b", "c", "ind_xmy") |
+     pe$lhs %in% c("ind_xmy"), 
+   c("lhs", "op", "rhs", "label", "est", "se", "ci.lower", "ci.upper", "pvalue")]`,
+      referenceText: 'Bootstrap 结果显示，within-person 间接效应 ind_xmy = 0.086，95% bootstrap CI [0.041, 0.132] 不包含 0，说明本次模拟中 X1 -> M2 -> Y3 的个体内间接效应有统计支持；但仍应表述为跨时间预测机制，而不是强因果证明。'
+    },
+    hints: [
+      'lavaan 中 bootstrap 标准误可以写在拟合函数里：se = "bootstrap", bootstrap = 5000。',
+      '间接效应仍然靠模型中的定义参数：ind_xmy := a*b。',
+      '读取区间时可以用 parameterEstimates(fit_boot, ci = TRUE, boot.ci.type = "perc")。',
+      '判断显著性最直接：bootstrap CI 是否包含 0；本题参考 CI 为 [0.041, 0.132]。'
+    ],
+    values: [
+      { key:'indirect', label:'ind_xmy 间接效应估计' },
+      { key:'ci_low', label:'Bootstrap CI 下限' },
+      { key:'ci_high', label:'Bootstrap CI 上限' },
+      { key:'direct', label:'c 直接效应估计' }
+    ],
+    textPrompt: '用1-2句话解释 bootstrap CI 是否支持 within-person 间接效应，注意不要写成过强因果结论。',
+    starterCode:
+`# Module 5 bootstrap 检验 starter code
+library(lavaan)
+
+data <- read.csv("stress_rumination_depression_3wave.csv")
+
+# 已给出完整三变量 RI-CLPM 中介骨架；本题只需要补 bootstrap 与提取代码
+model <- '
+  RI_x =~ 1*x1 + 1*x2 + 1*x3
+  RI_m =~ 1*m1 + 1*m2 + 1*m3
+  RI_y =~ 1*y1 + 1*y2 + 1*y3
+
+  wx1 =~ 1*x1; wx2 =~ 1*x2; wx3 =~ 1*x3
+  wm1 =~ 1*m1; wm2 =~ 1*m2; wm3 =~ 1*m3
+  wy1 =~ 1*y1; wy2 =~ 1*y2; wy3 =~ 1*y3
+
+  x1 ~~ 0*x1; x2 ~~ 0*x2; x3 ~~ 0*x3
+  m1 ~~ 0*m1; m2 ~~ 0*m2; m3 ~~ 0*m3
+  y1 ~~ 0*y1; y2 ~~ 0*y2; y3 ~~ 0*y3
+
+  wx2 ~ ax*wx1; wx3 ~ ax*wx2
+  wm2 ~ am*wm1; wm3 ~ am*wm2
+  wy2 ~ ay*wy1; wy3 ~ ay*wy2
+
+  wm2 ~ a*wx1
+  wy3 ~ b*wm2 + c*wx1
+
+  wx1 ~~ wm1 + wy1
+  wm1 ~~ wy1
+  wx2 ~~ wm2 + wy2
+  wm2 ~~ wy2
+  wx3 ~~ wm3 + wy3
+  wm3 ~~ wy3
+  RI_x ~~ RI_m + RI_y
+  RI_m ~~ RI_y
+
+  ind_xmy := a*b
+'
+
+fit_boot <- lavaan(
+  model,
+  data = data,
+  estimator = "ML",
+  missing = "listwise",
+  std.lv = FALSE
+  # 请补上 bootstrap 设置
+)
+
+# 请补上参数表提取代码，输出 ind_xmy 的 est、ci.lower、ci.upper
+`,
+    simOutput:
+`Bootstrap parameter estimates（教学模拟）
+                   Estimate  SE.boot  ci.lower  ci.upper
+  a                0.330     0.061    0.211     0.452
+  b                0.260     0.057    0.149     0.373
+  c                0.090     0.052   -0.011     0.194
+  ind_xmy := a*b   0.086     0.023    0.041     0.132
+
+Fit indices:
+  CFI = 0.964
+  RMSEA = 0.046
+  SRMR = 0.041`,
+    dataName: 'stress_rumination_depression_3wave.csv',
+    starterName: 'module5_bootstrap_starter.R'
+  },
   m7_q1: {
     title:    '从输出中提取拟合指标与路径系数',
     type:     'values',
